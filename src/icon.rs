@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+// Copyright 2026 不坑老师 · https://github.com/44886/exeify
 
 //! 图标处理：把用户的 .png / .ico 统一转成 Windows .ico 字节。
 //!

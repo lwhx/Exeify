@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+// Copyright 2026 不坑老师 · https://github.com/44886/exeify
 
 //! GUI 打包器模式：白色极简界面 + 通过 IPC 驱动打包。
 
@@ -111,7 +111,7 @@ pub fn run() -> Result<()> {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("html2exe — 网页打包器")
+        .with_title("Exeify — 网页打包器")
         .with_inner_size(LogicalSize::new(560.0, 720.0))
         .with_min_inner_size(LogicalSize::new(480.0, 600.0))
         .with_resizable(true)

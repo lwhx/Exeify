@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+// Copyright 2026 不坑老师 · https://github.com/44886/exeify
 //
 // 发布版隐藏控制台窗口；debug 版保留控制台便于观察日志。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -68,7 +68,7 @@ fn main() {
     }
 }
 
-/// 将 WebView2 用户数据目录设置到 `%LOCALAPPDATA%\html2exe\<exe名>`。
+/// 将 WebView2 用户数据目录设置到 `%LOCALAPPDATA%\exeify\<exe名>`。
 /// 若用户已通过环境变量指定，则尊重其设置。
 fn redirect_webview_data_dir() {
     if std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_some() {
@@ -96,15 +96,15 @@ fn redirect_webview_data_dir() {
     } else {
         safe
     };
-    let dir = std::path::PathBuf::from(base).join("html2exe").join(safe);
+    let dir = std::path::PathBuf::from(base).join("exeify").join(safe);
     if std::fs::create_dir_all(&dir).is_ok() {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &dir);
     }
 }
 
 /// 隐藏 CLI 入口。用法：
-///   html2exe pack-local <目录> <输出.exe> [入口=index.html]
-///   html2exe pack-url   <网址> <输出.exe>
+///   exeify pack-local <目录> <输出.exe> [入口=index.html]
+///   exeify pack-url   <网址> <输出.exe>
 fn run_cli(args: &[String]) -> i32 {
     use config::WindowCfg;
     use std::path::Path;
@@ -120,7 +120,7 @@ fn run_cli(args: &[String]) -> i32 {
             packer::pack_url(&args[2], win, Path::new(&args[3]), icon)
         }
         _ => {
-            eprintln!("用法:\n  html2exe pack-local <目录> <输出.exe> [入口]\n  html2exe pack-url <网址> <输出.exe>");
+            eprintln!("用法:\n  exeify pack-local <目录> <输出.exe> [入口]\n  exeify pack-url <网址> <输出.exe>");
             return 2;
         }
     };
@@ -140,7 +140,7 @@ fn fatal(msg: &str) {
     eprintln!("{msg}");
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
-        .set_title("html2exe")
+        .set_title("Exeify")
         .set_description(msg)
         .show();
 }

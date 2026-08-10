@@ -1,13 +1,13 @@
 [package]
-name = "html2exe"
+name = "exeify"
 version = "0.1.0"
 edition = "2021"
 description = "把网址或本地 HTML 项目一键打包成 Windows exe（零工具链、秒级出包）"
 license = "Apache-2.0"
-repository = "https://github.com/44886/html2exe"
+repository = "https://github.com/44886/exeify"
 
 [[bin]]
-name = "html2exe"
+name = "exeify"
 path = "src/main.rs"
 
 [dependencies]
@@ -28,7 +28,7 @@ ico = "0.3"
 png = "0.17"
 
 [build-dependencies]
-# 把 html2exe.exe 自身的图标编进 PE
+# 把 exeify.exe 自身的图标编进 PE
 winresource = "0.1"
 
 [profile.release]

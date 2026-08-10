@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+// Copyright 2026 不坑老师 · https://github.com/44886/exeify
 
 fn main() {
-    // 把 html2exe.exe 自身图标编入 PE 资源（仅 Windows）。
+    // 把 exeify.exe 自身图标编入 PE 资源（仅 Windows）。
     #[cfg(windows)]
     {
         println!("cargo:rerun-if-changed=assets/icon.ico");
