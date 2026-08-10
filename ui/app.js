@@ -72,6 +72,11 @@
   const overlay = $("aboutOverlay");
   $("openAbout").addEventListener("click", () => overlay.classList.remove("hidden"));
   $("closeAbout").addEventListener("click", () => overlay.classList.add("hidden"));
+  // 开源地址：用系统默认浏览器打开，不导航当前界面
+  $("repoLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    send({ action: "openExternal", url: e.currentTarget.href });
+  });
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.classList.add("hidden");
   });

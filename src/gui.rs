@@ -36,6 +36,8 @@ struct IpcMsg {
     data: Option<PackReq>,
     #[serde(default, rename = "defaultName")]
     default_name: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
 }
 
 /// 打包请求
@@ -175,6 +177,14 @@ fn handle_ipc(
                     "entry": entries.first().cloned().unwrap_or_default(),
                 });
                 let _ = webview.evaluate_script(&format!("window.__onFolderPicked({});", payload));
+            }
+        }
+        // 用系统默认浏览器打开外部链接（避免把打包器界面导航走）
+        "openExternal" => {
+            if let Some(url) = parsed.url.as_deref() {
+                if url.starts_with("http://") || url.starts_with("https://") {
+                    let _ = std::process::Command::new("explorer").arg(url).spawn();
+                }
             }
         }
         // 选择图标文件（.ico/.png）
