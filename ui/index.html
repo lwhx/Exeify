@@ -21,6 +21,10 @@
           <p>把网址或本地网页，一键打包成 exe</p>
         </div>
       </div>
+      <button class="about-link" id="openAbout" title="关于">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.1" fill="currentColor"/></svg>
+        关于
+      </button>
     </header>
 
     <div class="tabs" role="tablist">
@@ -90,6 +94,28 @@
 
     <div class="status" id="status" aria-live="polite"></div>
   </main>
+
+  <div class="overlay hidden" id="aboutOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+      <button class="modal-close" id="closeAbout" title="关闭">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <h2 id="aboutTitle">关于 html2exe</h2>
+      <p class="about-desc">把网址或本地网页，一键打包成可运行的 exe。<br/>轻量、秒级出包、零工具链。</p>
+      <div class="qr">
+        <img src="qrcode.jpg" alt="不坑老师 微信公众号二维码" width="180" height="180" />
+        <div class="qr-cap">
+          <strong>不坑老师</strong>
+          <span>微信扫码关注公众号</span>
+        </div>
+      </div>
+      <div class="about-foot">
+        <span>开源地址（Apache-2.0）</span>
+        <code>github.com/44886/html2exe</code>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

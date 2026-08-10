@@ -55,6 +55,17 @@
     send({ action: "pack", data: data });
   });
 
+  // ---- 关于弹层 ----
+  const overlay = $("aboutOverlay");
+  $("openAbout").addEventListener("click", () => overlay.classList.remove("hidden"));
+  $("closeAbout").addEventListener("click", () => overlay.classList.add("hidden"));
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.add("hidden");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") overlay.classList.add("hidden");
+  });
+
   // ---- 状态显示 ----
   function setStatus(text, kind) {
     const el = $("status");

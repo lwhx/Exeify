@@ -218,6 +218,7 @@ fn ui_asset(key: &str) -> Option<(&'static [u8], &'static str)> {
         "index.html" => Some((include_bytes!("../ui/index.html"), "text/html; charset=utf-8")),
         "style.css" => Some((include_bytes!("../ui/style.css"), "text/css; charset=utf-8")),
         "app.js" => Some((include_bytes!("../ui/app.js"), "text/javascript; charset=utf-8")),
+        "qrcode.jpg" => Some((include_bytes!("../ui/qrcode.jpg"), "image/jpeg")),
         _ => None,
     }
 }
