@@ -115,6 +115,7 @@ pub fn run() -> Result<()> {
         .with_inner_size(LogicalSize::new(560.0, 720.0))
         .with_min_inner_size(LogicalSize::new(480.0, 600.0))
         .with_resizable(true)
+        .with_window_icon(crate::app_window_icon())
         .build(&event_loop)
         .context("创建窗口失败")?;
 

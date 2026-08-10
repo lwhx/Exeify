@@ -25,6 +25,14 @@ pub fn asset_base_url() -> &'static str {
     }
 }
 
+/// 应用窗口图标（来自内嵌的 `assets/icon.png`），用于任务栏与标题栏。
+/// tao/winit 默认不会用 exe 的 PE 图标，必须运行时显式设置。
+pub fn app_window_icon() -> Option<tao::window::Icon> {
+    const PNG: &[u8] = include_bytes!("../assets/icon.png");
+    let (w, h, rgba) = icon::decode_png_rgba_bytes(PNG).ok()?;
+    tao::window::Icon::from_rgba(rgba, w, h).ok()
+}
+
 fn main() {
     // 把 WebView2 的用户数据目录重定向到 %LOCALAPPDATA%，
     // 避免在 exe 旁边生成 <名字>.exe.WebView2 缓存目录。

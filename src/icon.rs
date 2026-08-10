@@ -27,7 +27,16 @@ pub fn to_ico_bytes(path: &Path) -> Result<Vec<u8>> {
 fn decode_png_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>)> {
     let file =
         std::fs::File::open(path).with_context(|| format!("打开图标失败：{}", path.display()))?;
-    let mut decoder = png::Decoder::new(file);
+    decode_png_rgba_reader(file)
+}
+
+/// 从内存字节解码 PNG 为 RGBA8（用于内嵌图标/窗口图标）。
+pub fn decode_png_rgba_bytes(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>)> {
+    decode_png_rgba_reader(std::io::Cursor::new(bytes))
+}
+
+fn decode_png_rgba_reader<R: std::io::Read>(reader: R) -> Result<(u32, u32, Vec<u8>)> {
+    let mut decoder = png::Decoder::new(reader);
     // EXPAND：索引色→RGB(A)、低位深→8位、tRNS→alpha；STRIP_16：16位→8位
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = decoder

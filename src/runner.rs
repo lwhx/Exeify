@@ -79,6 +79,7 @@ pub fn run(payload: Payload) -> Result<()> {
         .with_title(&window.title)
         .with_inner_size(LogicalSize::new(window.width, window.height))
         .with_resizable(window.resizable)
+        .with_window_icon(crate::app_window_icon())
         .build(&event_loop)
         .context("创建窗口失败")?;
 
