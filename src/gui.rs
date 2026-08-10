@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+
 //! GUI 打包器模式：白色极简界面 + 通过 IPC 驱动打包。
 
 use crate::config::WindowCfg;

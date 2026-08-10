@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+//
 // 发布版隐藏控制台窗口；debug 版保留控制台便于观察日志。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+
 //! 产物 exe 尾部载荷的读写。
 //!
 //! 尾部格式（追加在原始 exe 之后）：

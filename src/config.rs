@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 不坑老师 · https://github.com/44886/html2exe
+
 //! 打包配置：写进产物 exe 尾部，runner 启动时读取。
 
 use serde::{Deserialize, Serialize};
