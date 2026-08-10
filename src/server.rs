@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 不坑老师 · https://github.com/44886/exeify
+// Copyright 2026 不坑老师 · https://github.com/44886/Exeify
 
 //! 本地回环 HTTP 服务器：把内存里的网页资源用真正的 `http://127.0.0.1` 源提供，
 //! 使 Vite/Vue/React 等框架的 ES Module、路由、fetch 都能正常工作

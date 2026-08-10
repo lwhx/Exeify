@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 不坑老师 · https://github.com/44886/exeify
+// Copyright 2026 不坑老师 · https://github.com/44886/Exeify
 
 fn main() {
     // 把 exeify.exe 自身图标编入 PE 资源（仅 Windows）。

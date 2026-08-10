@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "把网址或本地 HTML 项目一键打包成 Windows exe（零工具链、秒级出包）"
 license = "Apache-2.0"
-repository = "https://github.com/44886/exeify"
+repository = "https://github.com/44886/Exeify"
 
 [[bin]]
 name = "exeify"
