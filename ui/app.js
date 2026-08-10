@@ -24,6 +24,15 @@
     send({ action: "pickOutput", defaultName: (t || "app") + ".exe" });
   });
 
+  // ---- 图标选择 ----
+  const iconPlaceholder = $("iconPreview").innerHTML;
+  $("pickIcon").addEventListener("click", () => send({ action: "pickIcon" }));
+  $("clearIcon").addEventListener("click", () => {
+    $("icon").value = "";
+    $("iconPreview").innerHTML = iconPlaceholder;
+    $("clearIcon").classList.add("hidden");
+  });
+
   // ---- 打包 ----
   const packBtn = $("pack");
   packBtn.addEventListener("click", () => {
@@ -32,6 +41,7 @@
       url: $("url").value.trim(),
       folder: $("folder").value.trim(),
       entry: $("entry").value.trim() || "index.html",
+      icon: $("icon").value.trim(),
       title: $("title").value.trim() || "App",
       width: parseFloat($("width").value) || 1024,
       height: parseFloat($("height").value) || 720,
@@ -81,6 +91,15 @@
   window.__setOutput = (path) => {
     $("output").value = path;
     setStatus("输出到：" + path, "");
+  };
+  window.__setIcon = (path, dataUrl) => {
+    $("icon").value = path;
+    if (dataUrl) {
+      $("iconPreview").innerHTML =
+        '<img src="' + dataUrl + '" alt="图标预览" />';
+    }
+    $("clearIcon").classList.remove("hidden");
+    setStatus("已选择图标：" + path, "");
   };
   window.__packResult = (ok, msg) => {
     packBtn.disabled = false;

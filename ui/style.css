@@ -98,6 +98,24 @@ input[readonly] { background: #fafafa; color: #4a4c52; cursor: default; }
 .row { display: flex; gap: 8px; }
 .row input { flex: 1; }
 
+/* 图标选择 */
+.icon-row { align-items: center; }
+.icon-preview {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: #fafafa;
+  color: var(--muted);
+  overflow: hidden;
+}
+.icon-preview img { width: 100%; height: 100%; object-fit: contain; }
+.btn.icon-clear { padding: 10px 11px; }
+.hidden { display: none; }
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 90px 90px;

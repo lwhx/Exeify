@@ -20,6 +20,10 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 rfd = "0.15"
 mime_guess = "2"
 anyhow = "1"
+# 运行时改产物 exe 图标（不启用 images 特性，避免拉入重量级 image crate）
+editpe = { version = "0.2", default-features = false, features = ["std"] }
+# 把用户的 PNG 转成 ICO（.ico 直接用）
+ico = "0.3"
 
 [profile.release]
 opt-level = "z"

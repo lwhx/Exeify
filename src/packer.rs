@@ -66,8 +66,14 @@ fn walkdir(root: &Path) -> Result<Vec<std::path::PathBuf>> {
     Ok(out)
 }
 
-/// 打包本地目录 -> 产物 exe。
-pub fn pack_local(dir: &Path, entry: &str, window: WindowCfg, output: &Path) -> Result<()> {
+/// 打包本地目录 -> 产物 exe。`icon` 为可选的 .ico/.png 图标文件。
+pub fn pack_local(
+    dir: &Path,
+    entry: &str,
+    window: WindowCfg,
+    output: &Path,
+    icon: Option<&Path>,
+) -> Result<()> {
     // 入口文件必须存在
     let entry_path = dir.join(entry);
     if !entry_path.is_file() {
@@ -80,11 +86,11 @@ pub fn pack_local(dir: &Path, entry: &str, window: WindowCfg, output: &Path) -> 
         entry: entry.to_string(),
         window,
     };
-    write_output(&config, &archive, output)
+    write_output(&config, &archive, output, icon)
 }
 
-/// 打包 URL -> 产物 exe。
-pub fn pack_url(url: &str, window: WindowCfg, output: &Path) -> Result<()> {
+/// 打包 URL -> 产物 exe。`icon` 为可选的 .ico/.png 图标文件。
+pub fn pack_url(url: &str, window: WindowCfg, output: &Path, icon: Option<&Path>) -> Result<()> {
     let url = url.trim();
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         bail!("网址必须以 http:// 或 https:// 开头");
@@ -95,11 +101,56 @@ pub fn pack_url(url: &str, window: WindowCfg, output: &Path) -> Result<()> {
         entry: String::new(),
         window,
     };
-    write_output(&config, &[], output)
+    write_output(&config, &[], output, icon)
 }
 
-fn write_output(config: &PackConfig, archive: &[u8], output: &Path) -> Result<()> {
-    let stub = payload::clean_stub_from_current_exe()?;
+/// 把图标文件（.ico 直接用；其它按 PNG 处理）转成 .ico 字节。
+fn build_ico_bytes(icon_path: &Path) -> Result<Vec<u8>> {
+    let ext = icon_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ext == "ico" {
+        return std::fs::read(icon_path)
+            .with_context(|| format!("读取图标失败：{}", icon_path.display()));
+    }
+    // 按 PNG 处理
+    let file = std::fs::File::open(icon_path)
+        .with_context(|| format!("打开图标失败：{}", icon_path.display()))?;
+    let image = ico::IconImage::read_png(file)
+        .map_err(|e| anyhow!("PNG 图标解析失败（请用 PNG 或 ICO）：{e}"))?;
+    let mut dir = ico::IconDir::new(ico::ResourceType::Icon);
+    dir.add_entry(ico::IconDirEntry::encode(&image).map_err(|e| anyhow!("图标编码失败：{e}"))?);
+    let mut buf = Vec::new();
+    dir.write(&mut buf).map_err(|e| anyhow!("图标写出失败：{e}"))?;
+    Ok(buf)
+}
+
+/// 把图标写进 stub 的 PE 资源，返回新的 stub 字节。
+fn patch_icon(stub: Vec<u8>, icon_path: &Path) -> Result<Vec<u8>> {
+    let ico_bytes = build_ico_bytes(icon_path)?;
+    let mut image =
+        editpe::Image::parse(stub).map_err(|e| anyhow!("解析 exe 失败：{e}"))?;
+    let mut res = image.resource_directory().cloned().unwrap_or_default();
+    res.set_main_icon(ico_bytes.as_slice())
+        .map_err(|e| anyhow!("写入图标资源失败：{e}"))?;
+    image
+        .set_resource_directory(res)
+        .map_err(|e| anyhow!("应用图标资源失败：{e}"))?;
+    Ok(image.data().to_vec())
+}
+
+fn write_output(
+    config: &PackConfig,
+    archive: &[u8],
+    output: &Path,
+    icon: Option<&Path>,
+) -> Result<()> {
+    let mut stub = payload::clean_stub_from_current_exe()?;
+    if let Some(icon) = icon {
+        stub = patch_icon(stub, icon)?;
+    }
     let bytes = payload::build_output(&stub, config, archive)?;
     if output.extension().map(|e| e.to_ascii_lowercase()) != Some("exe".into()) {
         return Err(anyhow!("输出文件名必须以 .exe 结尾"));
@@ -147,7 +198,7 @@ mod tests {
     #[test]
     fn pack_url_rejects_bad_scheme() {
         let out = std::env::temp_dir().join("h2e_bad.exe");
-        let err = pack_url("ftp://nope", WindowCfg::default(), &out).unwrap_err();
+        let err = pack_url("ftp://nope", WindowCfg::default(), &out, None).unwrap_err();
         assert!(err.to_string().contains("http"));
     }
 

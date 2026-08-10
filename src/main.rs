@@ -61,10 +61,12 @@ fn run_cli(args: &[String]) -> i32 {
     let result = match args[1].as_str() {
         "pack-local" if args.len() >= 4 => {
             let entry = args.get(4).map(|s| s.as_str()).unwrap_or("index.html");
-            packer::pack_local(Path::new(&args[2]), entry, win, Path::new(&args[3]))
+            let icon = args.get(5).map(Path::new);
+            packer::pack_local(Path::new(&args[2]), entry, win, Path::new(&args[3]), icon)
         }
         "pack-url" if args.len() >= 4 => {
-            packer::pack_url(&args[2], win, Path::new(&args[3]))
+            let icon = args.get(4).map(Path::new);
+            packer::pack_url(&args[2], win, Path::new(&args[3]), icon)
         }
         _ => {
             eprintln!("用法:\n  html2exe pack-local <目录> <输出.exe> [入口]\n  html2exe pack-url <网址> <输出.exe>");

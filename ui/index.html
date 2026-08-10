@@ -77,6 +77,23 @@
     </label>
 
     <label class="field">
+      <span class="label">程序图标（可选，.ico / .png）</span>
+      <div class="row icon-row">
+        <span class="icon-preview" id="iconPreview" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M8 14l2.5-3 2 2.5L15 10l3 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/></svg>
+        </span>
+        <input id="icon" type="text" readonly placeholder="不选则使用默认图标" />
+        <button class="btn ghost" id="pickIcon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" stroke="currentColor" stroke-width="1.6"/></svg>
+          选择
+        </button>
+        <button class="btn ghost icon-clear hidden" id="clearIcon" title="清除">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </label>
+
+    <label class="field">
       <span class="label">输出 exe</span>
       <div class="row">
         <input id="output" type="text" readonly placeholder="选择保存位置，例如 app.exe" />

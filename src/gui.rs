@@ -45,11 +45,49 @@ struct PackReq {
     folder: Option<String>,
     #[serde(default)]
     entry: Option<String>,
+    #[serde(default)]
+    icon: Option<String>,
     title: String,
     width: f64,
     height: f64,
     resizable: bool,
     output: String,
+}
+
+/// 把图标文件读成 data URL，用于界面预览。文件过大则返回 None。
+fn icon_data_url(path: &std::path::Path) -> Option<String> {
+    let data = std::fs::read(path).ok()?;
+    if data.len() > 4 * 1024 * 1024 {
+        return None;
+    }
+    let mime = match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("ico") => "image/x-icon",
+        _ => "application/octet-stream",
+    };
+    Some(format!("data:{};base64,{}", mime, base64_encode(&data)))
+}
+
+/// 极简 base64 编码（标准字母表），避免额外依赖。
+fn base64_encode(input: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    for chunk in input.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(T[(n >> 18 & 63) as usize] as char);
+        out.push(T[(n >> 12 & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { T[(n >> 6 & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    out
 }
 
 fn js_str(s: &str) -> String {
@@ -117,6 +155,19 @@ fn handle_ipc(msg: &str, proxy: &tao::event_loop::EventLoopProxy<UserEvent>, web
                 let _ = webview.evaluate_script(&format!("window.__setFolder({});", js_str(&path)));
             }
         }
+        // 选择图标文件（.ico/.png）
+        "pickIcon" => {
+            let dialog = rfd::FileDialog::new().add_filter("图标", &["ico", "png"]);
+            if let Some(path) = dialog.pick_file() {
+                let s = path.to_string_lossy().to_string();
+                let preview = icon_data_url(&path).unwrap_or_default();
+                let _ = webview.evaluate_script(&format!(
+                    "window.__setIcon({}, {});",
+                    js_str(&s),
+                    js_str(&preview)
+                ));
+            }
+        }
         // 选择输出 exe 路径
         "pickOutput" => {
             let default_name = parsed.default_name.unwrap_or_else(|| "app.exe".to_string());
@@ -177,10 +228,18 @@ fn do_pack(req: PackReq) -> Result<String> {
         anyhow::bail!("请先选择输出路径");
     }
 
+    let icon_path = req
+        .icon
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from);
+    let icon = icon_path.as_deref();
+
     match req.mode.as_str() {
         "url" => {
             let url = req.url.unwrap_or_default();
-            packer::pack_url(&url, window, &output)?;
+            packer::pack_url(&url, window, &output, icon)?;
         }
         "local" => {
             let folder = req.folder.unwrap_or_default();
@@ -188,7 +247,7 @@ fn do_pack(req: PackReq) -> Result<String> {
                 anyhow::bail!("请先选择本地网页目录");
             }
             let entry = req.entry.filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "index.html".to_string());
-            packer::pack_local(&PathBuf::from(folder), &entry, window, &output)?;
+            packer::pack_local(&PathBuf::from(folder), &entry, window, &output, icon)?;
         }
         m => anyhow::bail!("未知模式：{m}"),
     }
