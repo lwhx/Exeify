@@ -65,7 +65,13 @@ pub fn run(payload: Payload) -> Result<()> {
                 entry
             };
             let port = server::start(assets, entry.clone())?;
-            format!("http://127.0.0.1:{port}/{}", entry.trim_start_matches('/'))
+            // 导航到入口所在目录（根 index.html => "/"），而非 /index.html，
+            // 以便前端路由（Vue Router 等 history 模式）能匹配到首页路由。
+            let base = match entry.trim_start_matches('/').rsplit_once('/') {
+                Some((dir, _)) => format!("/{dir}/"),
+                None => "/".to_string(),
+            };
+            format!("http://127.0.0.1:{port}{base}")
         }
     };
 
