@@ -88,8 +88,10 @@ pub fn run(payload: Payload) -> Result<()> {
             };
             let assets_cl = assets.clone();
             let entry_cl = entry.clone();
+            // 直接导航到入口文件本身，使其相对资源（含子目录入口）能正确解析
+            let start_url = format!("{}{}", crate::asset_base_url(), entry.trim_start_matches('/'));
             WebViewBuilder::new()
-                .with_url(crate::asset_base_url())
+                .with_url(start_url)
                 .with_custom_protocol("app".to_string(), move |_id, request| {
                     serve_local(&assets_cl, &entry_cl, &request)
                 })

@@ -77,7 +77,7 @@ html, body {
 .field { display: flex; flex-direction: column; gap: 6px; }
 .label { font-size: 12px; font-weight: 550; color: var(--muted); }
 
-input[type="text"], input[type="number"] {
+input[type="text"], input[type="number"], select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
@@ -89,10 +89,12 @@ input[type="text"], input[type="number"] {
   outline: none;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-input[type="text"]:focus, input[type="number"]:focus {
+input[type="text"]:focus, input[type="number"]:focus, select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(17, 18, 20, .08);
 }
+select { cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%238a8d94' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+select:disabled { color: var(--muted); background-color: #fafafa; cursor: default; }
 input[readonly] { background: #fafafa; color: #4a4c52; cursor: default; }
 
 .row { display: flex; gap: 8px; }

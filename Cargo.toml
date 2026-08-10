@@ -24,6 +24,12 @@ anyhow = "1"
 editpe = { version = "0.2", default-features = false, features = ["std"] }
 # 把用户的 PNG 转成 ICO（.ico 直接用）
 ico = "0.3"
+# 自己解码 PNG（支持索引/灰度/RGB/RGBA 全类型），已是 ico 的传递依赖
+png = "0.17"
+
+[build-dependencies]
+# 把 html2exe.exe 自身的图标编进 PE
+winresource = "0.1"
 
 [profile.release]
 opt-level = "z"

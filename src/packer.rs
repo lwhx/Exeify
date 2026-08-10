@@ -45,6 +45,44 @@ pub fn zip_dir(dir: &Path) -> Result<Vec<u8>> {
     Ok(cursor.into_inner())
 }
 
+/// 扫描目录识别可用的网页入口（.html/.htm），返回相对路径列表。
+/// 排序：根目录 index 优先、浅层优先、字母序。第一个即最佳默认入口。
+pub fn detect_html_entries(dir: &Path) -> Vec<String> {
+    let mut list: Vec<(bool, usize, String)> = Vec::new(); // (非index, 深度, 相对路径)
+    let mut stack = vec![(dir.to_path_buf(), 0usize)];
+    while let Some((p, depth)) = stack.pop() {
+        if depth > 4 {
+            continue;
+        }
+        let Ok(rd) = std::fs::read_dir(&p) else {
+            continue;
+        };
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+                    if name.starts_with('.') || name == "node_modules" {
+                        continue;
+                    }
+                }
+                stack.push((path, depth + 1));
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                let ext = ext.to_ascii_lowercase();
+                if ext == "html" || ext == "htm" {
+                    if let Ok(rel) = path.strip_prefix(dir) {
+                        let rel = rel.to_string_lossy().replace('\\', "/");
+                        let is_index = rel.eq_ignore_ascii_case("index.html")
+                            || rel.eq_ignore_ascii_case("index.htm");
+                        list.push((!is_index, depth, rel));
+                    }
+                }
+            }
+        }
+    }
+    list.sort();
+    list.into_iter().map(|(_, _, r)| r).collect()
+}
+
 /// 简单递归遍历（避免额外依赖 walkdir crate）。
 fn walkdir(root: &Path) -> Result<Vec<std::path::PathBuf>> {
     let mut out = Vec::new();
@@ -104,32 +142,9 @@ pub fn pack_url(url: &str, window: WindowCfg, output: &Path, icon: Option<&Path>
     write_output(&config, &[], output, icon)
 }
 
-/// 把图标文件（.ico 直接用；其它按 PNG 处理）转成 .ico 字节。
-fn build_ico_bytes(icon_path: &Path) -> Result<Vec<u8>> {
-    let ext = icon_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    if ext == "ico" {
-        return std::fs::read(icon_path)
-            .with_context(|| format!("读取图标失败：{}", icon_path.display()));
-    }
-    // 按 PNG 处理
-    let file = std::fs::File::open(icon_path)
-        .with_context(|| format!("打开图标失败：{}", icon_path.display()))?;
-    let image = ico::IconImage::read_png(file)
-        .map_err(|e| anyhow!("PNG 图标解析失败（请用 PNG 或 ICO）：{e}"))?;
-    let mut dir = ico::IconDir::new(ico::ResourceType::Icon);
-    dir.add_entry(ico::IconDirEntry::encode(&image).map_err(|e| anyhow!("图标编码失败：{e}"))?);
-    let mut buf = Vec::new();
-    dir.write(&mut buf).map_err(|e| anyhow!("图标写出失败：{e}"))?;
-    Ok(buf)
-}
-
 /// 把图标写进 stub 的 PE 资源，返回新的 stub 字节。
 fn patch_icon(stub: Vec<u8>, icon_path: &Path) -> Result<Vec<u8>> {
-    let ico_bytes = build_ico_bytes(icon_path)?;
+    let ico_bytes = crate::icon::to_ico_bytes(icon_path)?;
     let mut image =
         editpe::Image::parse(stub).map_err(|e| anyhow!("解析 exe 失败：{e}"))?;
     let mut res = image.resource_directory().cloned().unwrap_or_default();
@@ -200,6 +215,31 @@ mod tests {
         let out = std::env::temp_dir().join("h2e_bad.exe");
         let err = pack_url("ftp://nope", WindowCfg::default(), &out, None).unwrap_err();
         assert!(err.to_string().contains("http"));
+    }
+
+    #[test]
+    fn detect_entries_prefers_root_index() {
+        let tmp = std::env::temp_dir().join(format!("h2e_detect_{}", std::process::id()));
+        let sub = tmp.join("pages");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(tmp.join("about.html"), b"x").unwrap();
+        std::fs::write(tmp.join("index.html"), b"x").unwrap();
+        std::fs::write(sub.join("deep.html"), b"x").unwrap();
+
+        let entries = detect_html_entries(&tmp);
+        assert_eq!(entries.first().map(String::as_str), Some("index.html"));
+        assert!(entries.contains(&"about.html".to_string()));
+        assert!(entries.contains(&"pages/deep.html".to_string()));
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn detect_entries_empty_when_no_html() {
+        let tmp = std::env::temp_dir().join(format!("h2e_nohtml_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(tmp.join("readme.txt"), b"x").unwrap();
+        assert!(detect_html_entries(&tmp).is_empty());
+        std::fs::remove_dir_all(&tmp).ok();
     }
 
     #[test]

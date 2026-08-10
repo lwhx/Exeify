@@ -3,6 +3,7 @@
 
 mod config;
 mod gui;
+mod icon;
 mod packer;
 mod payload;
 mod runner;

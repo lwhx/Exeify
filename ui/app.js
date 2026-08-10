@@ -56,6 +56,9 @@
     if (mode === "local" && !data.folder) {
       return setStatus("请先选择本地网页目录", "err");
     }
+    if (mode === "local" && !data.entry) {
+      return setStatus("未识别到入口网页，请换一个包含 .html 的目录", "err");
+    }
     if (!data.output) {
       return setStatus("请先选择输出 exe 的保存位置", "err");
     }
@@ -84,9 +87,29 @@
   }
 
   // ---- 供 Rust 回调 ----
-  window.__setFolder = (path) => {
-    $("folder").value = path;
-    setStatus("已选择目录：" + path, "");
+  window.__onFolderPicked = (data) => {
+    $("folder").value = data.folder || "";
+    const sel = $("entry");
+    sel.innerHTML = "";
+    const entries = data.entries || [];
+    if (entries.length === 0) {
+      sel.disabled = true;
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "未找到网页文件（.html）";
+      sel.appendChild(opt);
+      return setStatus("该目录下没有找到 .html 网页文件", "err");
+    }
+    entries.forEach((e) => {
+      const opt = document.createElement("option");
+      opt.value = e;
+      opt.textContent = e;
+      sel.appendChild(opt);
+    });
+    sel.value = data.entry || entries[0];
+    sel.disabled = false;
+    const extra = entries.length > 1 ? "（共 " + entries.length + " 个，可切换）" : "";
+    setStatus("已识别入口：" + sel.value + extra, "");
   };
   window.__setOutput = (path) => {
     $("output").value = path;

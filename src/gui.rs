@@ -148,11 +148,18 @@ fn handle_ipc(msg: &str, proxy: &tao::event_loop::EventLoopProxy<UserEvent>, web
     };
 
     match parsed.action.as_str() {
-        // 选择本地目录 —— 在主线程弹原生对话框
+        // 选择本地目录 —— 在主线程弹原生对话框，并自动识别网页入口
         "pickFolder" => {
             if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                 let path = folder.to_string_lossy().to_string();
-                let _ = webview.evaluate_script(&format!("window.__setFolder({});", js_str(&path)));
+                let entries = packer::detect_html_entries(&folder);
+                let payload = serde_json::json!({
+                    "folder": path,
+                    "entries": entries,
+                    "entry": entries.first().cloned().unwrap_or_default(),
+                });
+                let _ = webview
+                    .evaluate_script(&format!("window.__onFolderPicked({});", payload));
             }
         }
         // 选择图标文件（.ico/.png）
