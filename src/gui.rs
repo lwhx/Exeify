@@ -79,7 +79,7 @@ fn icon_data_url(path: &std::path::Path) -> Option<String> {
 /// 极简 base64 编码（标准字母表），避免额外依赖。
 fn base64_encode(input: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = *chunk.get(1).unwrap_or(&0) as u32;
@@ -87,8 +87,16 @@ fn base64_encode(input: &[u8]) -> String {
         let n = (b0 << 16) | (b1 << 8) | b2;
         out.push(T[(n >> 18 & 63) as usize] as char);
         out.push(T[(n >> 12 & 63) as usize] as char);
-        out.push(if chunk.len() > 1 { T[(n >> 6 & 63) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            T[(n >> 6 & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            T[(n & 63) as usize] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -138,7 +146,11 @@ pub fn run() -> Result<()> {
     });
 }
 
-fn handle_ipc(msg: &str, proxy: &tao::event_loop::EventLoopProxy<UserEvent>, webview: &wry::WebView) {
+fn handle_ipc(
+    msg: &str,
+    proxy: &tao::event_loop::EventLoopProxy<UserEvent>,
+    webview: &wry::WebView,
+) {
     let parsed: IpcMsg = match serde_json::from_str(msg) {
         Ok(m) => m,
         Err(e) => {
@@ -161,8 +173,7 @@ fn handle_ipc(msg: &str, proxy: &tao::event_loop::EventLoopProxy<UserEvent>, web
                     "entries": entries,
                     "entry": entries.first().cloned().unwrap_or_default(),
                 });
-                let _ = webview
-                    .evaluate_script(&format!("window.__onFolderPicked({});", payload));
+                let _ = webview.evaluate_script(&format!("window.__onFolderPicked({});", payload));
             }
         }
         // 选择图标文件（.ico/.png）
@@ -196,8 +207,10 @@ fn handle_ipc(msg: &str, proxy: &tao::event_loop::EventLoopProxy<UserEvent>, web
         // 打包 —— 放到后台线程，完成后回调
         "pack" => {
             let Some(req) = parsed.data else {
-                let _ = webview
-                    .evaluate_script(&format!("window.__packResult(false, {});", js_str("缺少打包参数")));
+                let _ = webview.evaluate_script(&format!(
+                    "window.__packResult(false, {});",
+                    js_str("缺少打包参数")
+                ));
                 return;
             };
             let proxy = proxy.clone();
@@ -256,7 +269,10 @@ fn do_pack(req: PackReq) -> Result<String> {
             if folder.trim().is_empty() {
                 anyhow::bail!("请先选择本地网页目录");
             }
-            let entry = req.entry.filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "index.html".to_string());
+            let entry = req
+                .entry
+                .filter(|e| !e.trim().is_empty())
+                .unwrap_or_else(|| "index.html".to_string());
             packer::pack_local(&PathBuf::from(folder), &entry, window, &output, icon)?;
         }
         m => anyhow::bail!("未知模式：{m}"),
@@ -284,9 +300,15 @@ fn serve_ui(request: &Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
 
 fn ui_asset(key: &str) -> Option<(&'static [u8], &'static str)> {
     match key {
-        "index.html" => Some((include_bytes!("../ui/index.html"), "text/html; charset=utf-8")),
+        "index.html" => Some((
+            include_bytes!("../ui/index.html"),
+            "text/html; charset=utf-8",
+        )),
         "style.css" => Some((include_bytes!("../ui/style.css"), "text/css; charset=utf-8")),
-        "app.js" => Some((include_bytes!("../ui/app.js"), "text/javascript; charset=utf-8")),
+        "app.js" => Some((
+            include_bytes!("../ui/app.js"),
+            "text/javascript; charset=utf-8",
+        )),
         "qrcode.jpg" => Some((include_bytes!("../ui/qrcode.jpg"), "image/jpeg")),
         _ => None,
     }

@@ -30,13 +30,12 @@ pub fn zip_dir(dir: &Path) -> Result<Vec<u8>> {
             continue;
         }
         if entry.is_dir() {
-            zip.add_directory(format!("{rel}/"), opts.clone())
+            zip.add_directory(format!("{rel}/"), opts)
                 .context("写入目录项失败")?;
         } else {
             let data = std::fs::read(&entry)
                 .with_context(|| format!("读取文件失败：{}", entry.display()))?;
-            zip.start_file(&rel, opts.clone())
-                .context("创建 zip 条目失败")?;
+            zip.start_file(&rel, opts).context("创建 zip 条目失败")?;
             zip.write_all(&data).context("写入 zip 条目失败")?;
             count += 1;
         }
@@ -91,8 +90,8 @@ fn walkdir(root: &Path) -> Result<Vec<std::path::PathBuf>> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(p) = stack.pop() {
-        for entry in std::fs::read_dir(&p)
-            .with_context(|| format!("读取目录失败：{}", p.display()))?
+        for entry in
+            std::fs::read_dir(&p).with_context(|| format!("读取目录失败：{}", p.display()))?
         {
             let entry = entry?;
             let path = entry.path();
@@ -148,8 +147,7 @@ pub fn pack_url(url: &str, window: WindowCfg, output: &Path, icon: Option<&Path>
 /// 把图标写进 stub 的 PE 资源，返回新的 stub 字节。
 fn patch_icon(stub: Vec<u8>, icon_path: &Path) -> Result<Vec<u8>> {
     let ico_bytes = crate::icon::to_ico_bytes(icon_path)?;
-    let mut image =
-        editpe::Image::parse(stub).map_err(|e| anyhow!("解析 exe 失败：{e}"))?;
+    let mut image = editpe::Image::parse(stub).map_err(|e| anyhow!("解析 exe 失败：{e}"))?;
     let mut res = image.resource_directory().cloned().unwrap_or_default();
     res.set_main_icon(ico_bytes.as_slice())
         .map_err(|e| anyhow!("写入图标资源失败：{e}"))?;
@@ -207,7 +205,11 @@ mod tests {
         assert_eq!(names, vec!["assets/app.js", "index.html"]);
 
         let mut buf = String::new();
-        archive.by_name("index.html").unwrap().read_to_string(&mut buf).unwrap();
+        archive
+            .by_name("index.html")
+            .unwrap()
+            .read_to_string(&mut buf)
+            .unwrap();
         assert_eq!(buf, "<h1>hi</h1>");
 
         std::fs::remove_dir_all(&tmp).ok();

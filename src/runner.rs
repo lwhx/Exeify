@@ -41,7 +41,12 @@ fn unzip_to_map(archive: &[u8]) -> Result<HashMap<String, Vec<u8>>> {
 
 fn guess_mime(path: &str) -> &'static str {
     // 常见类型手动映射，兜底用 octet-stream
-    match path.rsplit('.').next().map(|s| s.to_ascii_lowercase()).as_deref() {
+    match path
+        .rsplit('.')
+        .next()
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
         Some("html") | Some("htm") => "text/html",
         Some("js") | Some("mjs") => "text/javascript",
         Some("css") => "text/css",
@@ -92,7 +97,11 @@ pub fn run(payload: Payload) -> Result<()> {
             let assets_cl = assets.clone();
             let entry_cl = entry.clone();
             // 直接导航到入口文件本身，使其相对资源（含子目录入口）能正确解析
-            let start_url = format!("{}{}", crate::asset_base_url(), entry.trim_start_matches('/'));
+            let start_url = format!(
+                "{}{}",
+                crate::asset_base_url(),
+                entry.trim_start_matches('/')
+            );
             WebViewBuilder::new()
                 .with_url(start_url)
                 .with_custom_protocol("app".to_string(), move |_id, request| {
@@ -128,8 +137,18 @@ fn serve_local(
     let hit = assets.contains_key(&key);
     if let Ok(log) = std::env::var("HTML2EXE_LOG") {
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log) {
-            let _ = writeln!(f, "{} {} -> {}", request.uri(), key, if hit { "200" } else { "404" });
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log)
+        {
+            let _ = writeln!(
+                f,
+                "{} {} -> {}",
+                request.uri(),
+                key,
+                if hit { "200" } else { "404" }
+            );
         }
     }
     match assets.get(&key) {

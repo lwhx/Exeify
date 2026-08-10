@@ -52,8 +52,8 @@ pub fn read_from_bytes(bytes: &[u8]) -> Result<Option<Payload>> {
         .checked_sub(payload_len)
         .ok_or_else(|| anyhow!("载荷损坏：payload 长度越界"))?;
 
-    let config: PackConfig = serde_json::from_slice(&bytes[config_start..config_end])
-        .context("解析打包配置失败")?;
+    let config: PackConfig =
+        serde_json::from_slice(&bytes[config_start..config_end]).context("解析打包配置失败")?;
     let archive = bytes[payload_start..config_start].to_vec();
 
     Ok(Some(Payload { config, archive }))

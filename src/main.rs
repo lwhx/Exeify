@@ -74,9 +74,19 @@ fn redirect_webview_data_dir() {
         .unwrap_or_else(|| "app".to_string());
     let safe: String = stem
         .chars()
-        .map(|c| if c.is_alphanumeric() || matches!(c, '-' | '_') { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, '-' | '_') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
-    let safe = if safe.is_empty() { "app".to_string() } else { safe };
+    let safe = if safe.is_empty() {
+        "app".to_string()
+    } else {
+        safe
+    };
     let dir = std::path::PathBuf::from(base).join("html2exe").join(safe);
     if std::fs::create_dir_all(&dir).is_ok() {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &dir);

@@ -40,10 +40,14 @@ fn decode_png_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>)> {
     let data = &buf[..info.buffer_size()];
     let rgba: Vec<u8> = match info.color_type {
         png::ColorType::Rgba => data.to_vec(),
-        png::ColorType::Rgb => data.chunks(3).flat_map(|p| [p[0], p[1], p[2], 255]).collect(),
-        png::ColorType::GrayscaleAlpha => {
-            data.chunks(2).flat_map(|p| [p[0], p[0], p[0], p[1]]).collect()
-        }
+        png::ColorType::Rgb => data
+            .chunks(3)
+            .flat_map(|p| [p[0], p[1], p[2], 255])
+            .collect(),
+        png::ColorType::GrayscaleAlpha => data
+            .chunks(2)
+            .flat_map(|p| [p[0], p[0], p[0], p[1]])
+            .collect(),
         png::ColorType::Grayscale => data.iter().flat_map(|&g| [g, g, g, 255]).collect(),
         png::ColorType::Indexed => bail!("PNG 调色板未正确展开"),
     };
@@ -57,7 +61,7 @@ fn build_ico_from_rgba(w: u32, h: u32, rgba: &[u8]) -> Result<Vec<u8>> {
     }
     let mut dir = ico::IconDir::new(ico::ResourceType::Icon);
     let max_side = w.max(h).min(256); // ICO 单条目最大 256
-    // 生成不超过源尺寸的标准尺寸集合
+                                      // 生成不超过源尺寸的标准尺寸集合
     let mut sizes: Vec<u32> = [256, 128, 64, 48, 32, 16]
         .into_iter()
         .filter(|&s| s <= max_side)
@@ -71,7 +75,8 @@ fn build_ico_from_rgba(w: u32, h: u32, rgba: &[u8]) -> Result<Vec<u8>> {
         dir.add_entry(ico::IconDirEntry::encode(&img).map_err(|e| anyhow!("图标编码失败：{e}"))?);
     }
     let mut out = Vec::new();
-    dir.write(&mut out).map_err(|e| anyhow!("图标写出失败：{e}"))?;
+    dir.write(&mut out)
+        .map_err(|e| anyhow!("图标写出失败：{e}"))?;
     Ok(out)
 }
 
