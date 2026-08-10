@@ -22,6 +22,10 @@ pub fn asset_base_url() -> &'static str {
 }
 
 fn main() {
+    // 把 WebView2 的用户数据目录重定向到 %LOCALAPPDATA%，
+    // 避免在 exe 旁边生成 <名字>.exe.WebView2 缓存目录。
+    redirect_webview_data_dir();
+
     // 隐藏 CLI：便于脚本化打包与自测（GUI 用户不会用到）。
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 2 && matches!(args[1].as_str(), "pack-local" | "pack-url") {
@@ -48,6 +52,30 @@ fn main() {
                 fatal(&format!("界面启动失败：{e:#}"));
             }
         }
+    }
+}
+
+/// 将 WebView2 用户数据目录设置到 `%LOCALAPPDATA%\html2exe\<exe名>`。
+/// 若用户已通过环境变量指定，则尊重其设置。
+fn redirect_webview_data_dir() {
+    if std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_some() {
+        return;
+    }
+    let Some(base) = std::env::var_os("LOCALAPPDATA") else {
+        return;
+    };
+    let stem = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "app".to_string());
+    let safe: String = stem
+        .chars()
+        .map(|c| if c.is_alphanumeric() || matches!(c, '-' | '_') { c } else { '_' })
+        .collect();
+    let safe = if safe.is_empty() { "app".to_string() } else { safe };
+    let dir = std::path::PathBuf::from(base).join("html2exe").join(safe);
+    if std::fs::create_dir_all(&dir).is_ok() {
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &dir);
     }
 }
 
