@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>html2exe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="head">
+      <div class="brand">
+        <svg class="logo" width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M3 8h18" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M8.5 12.5 10.5 14.5 8.5 16.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13 16.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <div class="brand-txt">
+          <h1>html2exe</h1>
+          <p>把网址或本地网页，一键打包成 exe</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" data-mode="local" role="tab">本地网页目录</button>
+      <button class="tab" data-mode="url" role="tab">在线网址</button>
+    </div>
+
+    <section class="panel" data-panel="local">
+      <label class="field">
+        <span class="label">网页目录</span>
+        <div class="row">
+          <input id="folder" type="text" readonly placeholder="选择包含 index.html 的文件夹" />
+          <button class="btn ghost" id="pickFolder">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" stroke="currentColor" stroke-width="1.6"/></svg>
+            选择
+          </button>
+        </div>
+      </label>
+      <label class="field">
+        <span class="label">入口文件</span>
+        <input id="entry" type="text" value="index.html" placeholder="index.html" />
+      </label>
+    </section>
+
+    <section class="panel hidden" data-panel="url">
+      <label class="field">
+        <span class="label">网址</span>
+        <input id="url" type="text" placeholder="https://example.com" />
+      </label>
+    </section>
+
+    <section class="grid">
+      <label class="field">
+        <span class="label">窗口标题</span>
+        <input id="title" type="text" value="My App" />
+      </label>
+      <label class="field small">
+        <span class="label">宽</span>
+        <input id="width" type="number" value="1024" min="200" />
+      </label>
+      <label class="field small">
+        <span class="label">高</span>
+        <input id="height" type="number" value="720" min="200" />
+      </label>
+    </section>
+
+    <label class="check">
+      <input id="resizable" type="checkbox" checked />
+      <span>允许调整窗口大小</span>
+    </label>
+
+    <label class="field">
+      <span class="label">输出 exe</span>
+      <div class="row">
+        <input id="output" type="text" readonly placeholder="选择保存位置，例如 app.exe" />
+        <button class="btn ghost" id="pickOutput">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 18h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          选择
+        </button>
+      </div>
+    </label>
+
+    <button class="btn primary" id="pack">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 8 12 3 3 8m18 0-9 5m9-5v8l-9 5m0-8L3 8m9 5v8M3 8v8l9 5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      开始打包
+    </button>
+
+    <div class="status" id="status" aria-live="polite"></div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

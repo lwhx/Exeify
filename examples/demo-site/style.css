@@ -1,0 +1,4 @@
+body { margin: 0; font-family: system-ui, "Microsoft YaHei", sans-serif; background: #fafafa; color: #16171a; display: grid; place-items: center; height: 100vh; }
+main { text-align: center; }
+h1 { font-weight: 650; }
+button { margin-top: 12px; padding: 10px 20px; border: 1px solid #d6d6da; border-radius: 9px; background: #111214; color: #fff; font-size: 14px; cursor: pointer; }
