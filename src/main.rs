@@ -10,6 +10,7 @@ mod icon;
 mod packer;
 mod payload;
 mod runner;
+mod server;
 
 /// 自定义协议 `app` 的起始地址。
 /// Windows/WebView2 下自定义协议被映射为 `http://<scheme>.localhost/`，
