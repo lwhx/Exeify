@@ -4,6 +4,7 @@
 // 发布版隐藏控制台窗口；debug 版保留控制台便于观察日志。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod b64;
 mod config;
 mod gui;
 mod icon;
@@ -113,11 +114,18 @@ fn run_cli(args: &[String]) -> i32 {
         "pack-local" if args.len() >= 4 => {
             let entry = args.get(4).map(|s| s.as_str()).unwrap_or("index.html");
             let icon = args.get(5).map(Path::new);
-            packer::pack_local(Path::new(&args[2]), entry, win, Path::new(&args[3]), icon)
+            packer::pack_local(
+                Path::new(&args[2]),
+                entry,
+                win,
+                Path::new(&args[3]),
+                icon,
+                None,
+            )
         }
         "pack-url" if args.len() >= 4 => {
             let icon = args.get(4).map(Path::new);
-            packer::pack_url(&args[2], win, Path::new(&args[3]), icon)
+            packer::pack_url(&args[2], win, Path::new(&args[3]), icon, None)
         }
         _ => {
             eprintln!("用法:\n  exeify pack-local <目录> <输出.exe> [入口]\n  exeify pack-url <网址> <输出.exe>");

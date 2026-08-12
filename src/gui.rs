@@ -3,7 +3,7 @@
 
 //! GUI 打包器模式：白色极简界面 + 通过 IPC 驱动打包。
 
-use crate::config::WindowCfg;
+use crate::config::{SplashCfg, WindowCfg, WindowState};
 use crate::packer;
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -57,6 +57,18 @@ struct PackReq {
     height: f64,
     resizable: bool,
     output: String,
+    /// 启动状态："normal" | "maximized" | "fullscreen"
+    #[serde(default)]
+    state: Option<String>,
+    /// 启动图文件路径（.png/.jpg），空则不生成启动页
+    #[serde(default)]
+    splash: Option<String>,
+    /// 启动页最少显示毫秒
+    #[serde(default)]
+    splash_ms: Option<u64>,
+    /// 启动页背景色 "#rrggbb"
+    #[serde(default)]
+    splash_bg: Option<String>,
 }
 
 /// 把图标文件读成 data URL，用于界面预览。文件过大则返回 None。
@@ -75,32 +87,39 @@ fn icon_data_url(path: &std::path::Path) -> Option<String> {
         Some("ico") => "image/x-icon",
         _ => "application/octet-stream",
     };
-    Some(format!("data:{};base64,{}", mime, base64_encode(&data)))
+    Some(format!(
+        "data:{};base64,{}",
+        mime,
+        crate::b64::encode(&data)
+    ))
 }
 
-/// 极简 base64 编码（标准字母表），避免额外依赖。
-fn base64_encode(input: &[u8]) -> String {
-    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
-    for chunk in input.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
-        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
-        let n = (b0 << 16) | (b1 << 8) | b2;
-        out.push(T[(n >> 18 & 63) as usize] as char);
-        out.push(T[(n >> 12 & 63) as usize] as char);
-        out.push(if chunk.len() > 1 {
-            T[(n >> 6 & 63) as usize] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 {
-            T[(n & 63) as usize] as char
-        } else {
-            '='
-        });
+/// 把启动图文件读成 data URL（用于界面预览）。仅接受 png/jpg，过大返回 None。
+fn splash_data_url(path: &std::path::Path) -> Option<String> {
+    let data = std::fs::read(path).ok()?;
+    if data.len() > 8 * 1024 * 1024 {
+        return None;
     }
-    out
+    let mime = splash_mime(path)?;
+    Some(format!(
+        "data:{};base64,{}",
+        mime,
+        crate::b64::encode(&data)
+    ))
+}
+
+/// 由扩展名判断启动图 MIME，仅支持 png / jpg。
+fn splash_mime(path: &std::path::Path) -> Option<&'static str> {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => Some("image/png"),
+        Some("jpg") | Some("jpeg") => Some("image/jpeg"),
+        _ => None,
+    }
 }
 
 fn js_str(s: &str) -> String {
@@ -114,8 +133,8 @@ pub fn run() -> Result<()> {
 
     let window = WindowBuilder::new()
         .with_title("Exeify — 网页打包器")
-        .with_inner_size(LogicalSize::new(560.0, 720.0))
-        .with_min_inner_size(LogicalSize::new(480.0, 600.0))
+        .with_inner_size(LogicalSize::new(880.0, 640.0))
+        .with_min_inner_size(LogicalSize::new(760.0, 560.0))
         .with_resizable(true)
         .with_window_icon(crate::app_window_icon())
         .build(&event_loop)
@@ -200,6 +219,19 @@ fn handle_ipc(
                 ));
             }
         }
+        // 选择启动图（.png/.jpg）
+        "pickSplash" => {
+            let dialog = rfd::FileDialog::new().add_filter("图片", &["png", "jpg", "jpeg"]);
+            if let Some(path) = dialog.pick_file() {
+                let s = path.to_string_lossy().to_string();
+                let preview = splash_data_url(&path).unwrap_or_default();
+                let _ = webview.evaluate_script(&format!(
+                    "window.__setSplash({}, {});",
+                    js_str(&s),
+                    js_str(&preview)
+                ));
+            }
+        }
         // 选择输出 exe 路径
         "pickOutput" => {
             let default_name = parsed.default_name.unwrap_or_else(|| "app.exe".to_string());
@@ -256,6 +288,7 @@ fn do_pack(req: PackReq) -> Result<String> {
         width: if req.width > 0.0 { req.width } else { 1024.0 },
         height: if req.height > 0.0 { req.height } else { 720.0 },
         resizable: req.resizable,
+        state: parse_state(req.state.as_deref()),
     };
     let output = PathBuf::from(&req.output);
     if req.output.trim().is_empty() {
@@ -270,10 +303,12 @@ fn do_pack(req: PackReq) -> Result<String> {
         .map(PathBuf::from);
     let icon = icon_path.as_deref();
 
+    let splash = build_splash(&req)?;
+
     match req.mode.as_str() {
         "url" => {
             let url = req.url.unwrap_or_default();
-            packer::pack_url(&url, window, &output, icon)?;
+            packer::pack_url(&url, window, &output, icon, splash)?;
         }
         "local" => {
             let folder = req.folder.unwrap_or_default();
@@ -284,11 +319,61 @@ fn do_pack(req: PackReq) -> Result<String> {
                 .entry
                 .filter(|e| !e.trim().is_empty())
                 .unwrap_or_else(|| "index.html".to_string());
-            packer::pack_local(&PathBuf::from(folder), &entry, window, &output, icon)?;
+            packer::pack_local(
+                &PathBuf::from(folder),
+                &entry,
+                window,
+                &output,
+                icon,
+                splash,
+            )?;
         }
         m => anyhow::bail!("未知模式：{m}"),
     }
     Ok(output.to_string_lossy().to_string())
+}
+
+/// 把前端下拉值解析成窗口状态，未知/缺省时为普通窗口。
+fn parse_state(s: Option<&str>) -> WindowState {
+    match s {
+        Some("maximized") => WindowState::Maximized,
+        Some("fullscreen") => WindowState::Fullscreen,
+        _ => WindowState::Normal,
+    }
+}
+
+/// 由启动图路径读取字节并组装启动页配置。未选启动图返回 None。
+fn build_splash(req: &PackReq) -> Result<Option<SplashCfg>> {
+    let Some(path) = req
+        .splash
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+    else {
+        return Ok(None);
+    };
+    let mime = splash_mime(&path)
+        .ok_or_else(|| anyhow::anyhow!("启动图仅支持 png / jpg"))?
+        .to_string();
+    let bytes =
+        std::fs::read(&path).with_context(|| format!("读取启动图失败：{}", path.display()))?;
+    // 默认 1500ms；背景色默认深石板，与设计文档一致。
+    let min_ms = req.splash_ms.unwrap_or(1500);
+    let bg = req
+        .splash_bg
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("#0f172a")
+        .to_string();
+    Ok(Some(SplashCfg {
+        image_b64: crate::b64::encode(&bytes),
+        mime,
+        min_ms,
+        bg,
+        fit: "cover".to_string(),
+    }))
 }
 
 // ---- 内嵌 UI 资源 ----

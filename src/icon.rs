@@ -23,6 +23,36 @@ pub fn to_ico_bytes(path: &Path) -> Result<Vec<u8>> {
     build_ico_from_rgba(w, h, &rgba)
 }
 
+/// 把图标文件（.png / .ico）统一解码为 RGBA8，返回 (宽, 高, 像素)。
+/// 用于运行时窗口/任务栏图标：`.ico` 取尺寸最大的一帧，其它按 PNG 解码。
+pub fn decode_to_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>)> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ext == "ico" {
+        let file = std::fs::File::open(path)
+            .with_context(|| format!("打开图标失败：{}", path.display()))?;
+        let dir = ico::IconDir::read(std::io::BufReader::new(file))
+            .map_err(|e| anyhow!("ICO 解析失败：{e}"))?;
+        let entry = dir
+            .entries()
+            .iter()
+            .max_by_key(|e| e.width() * e.height())
+            .ok_or_else(|| anyhow!("ICO 没有任何图标帧"))?;
+        let img = entry.decode().map_err(|e| anyhow!("ICO 解码失败：{e}"))?;
+        Ok((img.width(), img.height(), img.rgba_data().to_vec()))
+    } else {
+        decode_png_rgba(path)
+    }
+}
+
+/// 双线性缩放 RGBA（对外复用，如生成标准尺寸的窗口图标）。
+pub fn resize_rgba_to(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32) -> Vec<u8> {
+    resize_rgba(src, sw, sh, dw, dh)
+}
+
 /// 解码 PNG 为 RGBA8，兼容索引色 / 灰度等。
 fn decode_png_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>)> {
     let file =

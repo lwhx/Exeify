@@ -3,7 +3,7 @@
 
 //! 打包逻辑：把目录/URL 生成产物 exe。
 
-use crate::config::{Mode, PackConfig, WindowCfg};
+use crate::config::{Mode, PackConfig, SplashCfg, WindowCfg, WindowIcon};
 use crate::payload;
 use anyhow::{anyhow, bail, Context, Result};
 use std::io::Write;
@@ -106,13 +106,16 @@ fn walkdir(root: &Path) -> Result<Vec<std::path::PathBuf>> {
     Ok(out)
 }
 
-/// 打包本地目录 -> 产物 exe。`icon` 为可选的 .ico/.png 图标文件。
+/// 打包本地目录 -> 产物 exe。
+/// `icon` 为可选的 .ico/.png 图标文件（同时用于 PE 资源图标 + 运行时窗口图标）；
+/// `splash` 为可选启动页配置。
 pub fn pack_local(
     dir: &Path,
     entry: &str,
     window: WindowCfg,
     output: &Path,
     icon: Option<&Path>,
+    splash: Option<SplashCfg>,
 ) -> Result<()> {
     // 入口文件必须存在
     let entry_path = dir.join(entry);
@@ -125,12 +128,20 @@ pub fn pack_local(
         url: None,
         entry: entry.to_string(),
         window,
+        splash,
+        window_icon: window_icon_from(icon),
     };
     write_output(&config, &archive, output, icon)
 }
 
-/// 打包 URL -> 产物 exe。`icon` 为可选的 .ico/.png 图标文件。
-pub fn pack_url(url: &str, window: WindowCfg, output: &Path, icon: Option<&Path>) -> Result<()> {
+/// 打包 URL -> 产物 exe。参数含义同 [`pack_local`]。
+pub fn pack_url(
+    url: &str,
+    window: WindowCfg,
+    output: &Path,
+    icon: Option<&Path>,
+    splash: Option<SplashCfg>,
+) -> Result<()> {
     let url = url.trim();
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         bail!("网址必须以 http:// 或 https:// 开头");
@@ -140,8 +151,27 @@ pub fn pack_url(url: &str, window: WindowCfg, output: &Path, icon: Option<&Path>
         url: Some(url.to_string()),
         entry: String::new(),
         window,
+        splash,
+        window_icon: window_icon_from(icon),
     };
     write_output(&config, &[], output, icon)
+}
+
+/// 把用户图标解码成 256×256 RGBA，供运行时设为窗口/任务栏图标。
+/// 解码失败或未选图标时返回 None（运行时回退内置图标）。
+fn window_icon_from(icon: Option<&Path>) -> Option<WindowIcon> {
+    let path = icon?;
+    let (w, h, rgba) = crate::icon::decode_to_rgba(path).ok()?;
+    if w == 0 || h == 0 {
+        return None;
+    }
+    const SIDE: u32 = 256;
+    let rgba = crate::icon::resize_rgba_to(&rgba, w, h, SIDE, SIDE);
+    Some(WindowIcon {
+        w: SIDE,
+        h: SIDE,
+        rgba_b64: crate::b64::encode(&rgba),
+    })
 }
 
 /// 把图标写进 stub 的 PE 资源，返回新的 stub 字节。
@@ -218,7 +248,7 @@ mod tests {
     #[test]
     fn pack_url_rejects_bad_scheme() {
         let out = std::env::temp_dir().join("h2e_bad.exe");
-        let err = pack_url("ftp://nope", WindowCfg::default(), &out, None).unwrap_err();
+        let err = pack_url("ftp://nope", WindowCfg::default(), &out, None, None).unwrap_err();
         assert!(err.to_string().contains("http"));
     }
 

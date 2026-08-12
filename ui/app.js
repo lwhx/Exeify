@@ -33,9 +33,45 @@
     $("clearIcon").classList.add("hidden");
   });
 
+  // ---- 启动图选择 ----
+  const splashPlaceholder = $("splashPreview").innerHTML;
+  $("pickSplash").addEventListener("click", () => send({ action: "pickSplash" }));
+  $("clearSplash").addEventListener("click", () => {
+    $("splash").value = "";
+    $("splashPreview").innerHTML = splashPlaceholder;
+    $("clearSplash").classList.add("hidden");
+  });
+
+  // ---- 背景色选择器（color 与 hex 文本双向同步）----
+  const bg = $("splashBg");
+  const bgHex = $("splashBgHex");
+  bg.addEventListener("input", () => { bgHex.value = bg.value; });
+  bgHex.addEventListener("change", () => {
+    const v = bgHex.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+      bg.value = v;
+    } else {
+      bgHex.value = bg.value; // 非法则还原
+    }
+  });
+
+  // ---- 启动状态：选最大化/全屏时置灰宽高（仅普通模式生效）----
+  const stateSel = $("state");
+  function syncStateFields() {
+    const normal = stateSel.value === "normal";
+    ["width", "height"].forEach((id) => {
+      const input = $(id);
+      input.disabled = !normal;
+      input.closest(".field").classList.toggle("is-disabled", !normal);
+    });
+  }
+  stateSel.addEventListener("change", syncStateFields);
+  syncStateFields();
+
   // ---- 打包 ----
   const packBtn = $("pack");
   packBtn.addEventListener("click", () => {
+    const sec = parseFloat($("splashSec").value);
     const data = {
       mode: mode,
       url: $("url").value.trim(),
@@ -47,6 +83,10 @@
       height: parseFloat($("height").value) || 720,
       resizable: $("resizable").checked,
       output: $("output").value.trim(),
+      state: $("state").value,
+      splash: $("splash").value.trim(),
+      splash_ms: Math.max(0, Math.round((isNaN(sec) ? 1.5 : sec) * 1000)),
+      splash_bg: $("splashBg").value,
     };
 
     // 前端基础校验，给小白即时反馈
@@ -83,6 +123,38 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") overlay.classList.add("hidden");
   });
+
+  // ---- 侧栏导航：点击平滑滚动 + scroll-spy 高亮 ----
+  const contentEl = $("content");
+  const navItems = Array.from(document.querySelectorAll(".nav-item"));
+
+  function setActiveNav(targetId) {
+    navItems.forEach((n) => n.classList.toggle("is-active", n.dataset.target === targetId));
+  }
+
+  navItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const el = $(item.dataset.target);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveNav(item.dataset.target);
+    });
+  });
+
+  // scroll-spy：以 .content 为 root，进入上部即高亮对应菜单
+  const spyTargets = navItems
+    .map((n) => $(n.dataset.target))
+    .filter(Boolean);
+  if ("IntersectionObserver" in window && spyTargets.length) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) setActiveNav(entry.target.id);
+        });
+      },
+      { root: contentEl, rootMargin: "0px 0px -60% 0px", threshold: 0 }
+    );
+    spyTargets.forEach((sec) => io.observe(sec));
+  }
 
   // ---- 状态显示 ----
   function setStatus(text, kind) {
@@ -128,6 +200,15 @@
     }
     $("clearIcon").classList.remove("hidden");
     setStatus("已选择图标：" + path, "");
+  };
+  window.__setSplash = (path, dataUrl) => {
+    $("splash").value = path;
+    if (dataUrl) {
+      $("splashPreview").innerHTML =
+        '<img src="' + dataUrl + '" alt="启动图预览" />';
+    }
+    $("clearSplash").classList.remove("hidden");
+    setStatus("已选择启动图：" + path, "");
   };
   window.__packResult = (ok, msg) => {
     packBtn.disabled = false;

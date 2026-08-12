@@ -108,6 +108,8 @@ mod tests {
             url: None,
             entry: "index.html".into(),
             window: WindowCfg::default(),
+            splash: None,
+            window_icon: None,
         }
     }
 
@@ -138,6 +140,8 @@ mod tests {
             url: Some("https://example.com".into()),
             entry: String::new(),
             window: WindowCfg::default(),
+            splash: None,
+            window_icon: None,
         };
         let out = build_output(&stub, &cfg, &[]).unwrap();
         let p = read_from_bytes(&out).unwrap().unwrap();
