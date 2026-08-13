@@ -19,12 +19,15 @@ use tao::{
     event_loop::{ControlFlow, EventLoopBuilder},
     window::{Fullscreen, WindowBuilder},
 };
-use wry::{PageLoadEvent, WebViewBuilder};
+use wry::{NewWindowResponse, PageLoadEvent, WebViewBuilder};
 
 /// 事件循环自定义事件。
 enum UserEvent {
     /// 启动页加载完成，请求导航到真实目标（携带触发时刻，用于满足最少显示时长）。
     SplashLoaded,
+    /// 页面请求打开新窗口（target="_blank" / window.open），携带目标 URL。
+    /// 由事件循环在本应用内部新建 tao 窗口 + WebView 承接，绝不调用系统浏览器。
+    OpenWindow(String),
 }
 
 /// 把 zip 全部解压进内存，键为规范化后的相对路径（无前导斜杠）。
@@ -173,6 +176,14 @@ pub fn run(payload: Payload) -> Result<()> {
         wv_builder = wv_builder.with_url(&target_url);
     }
 
+    // 无条件挂新窗口处理器：页面里 target="_blank" / window.open 触发的新窗口请求，
+    // 统一发事件到主循环，由本应用内部新建窗口承接（Deny 拒绝 WebView2 默认行为，绝不走系统浏览器）。
+    let nw_proxy = event_loop.create_proxy();
+    wv_builder = wv_builder.with_new_window_req_handler(move |url, _features| {
+        let _ = nw_proxy.send_event(UserEvent::OpenWindow(url));
+        NewWindowResponse::Deny
+    });
+
     let webview = wv_builder.build(&win).context("创建 WebView 失败")?;
 
     // 启动页最少显示时长的计时起点（窗口出现即开始计时）。
@@ -185,17 +196,64 @@ pub fn run(payload: Payload) -> Result<()> {
     let mut splash_loaded = false;
     let mut navigated = false;
 
-    event_loop.run(move |event, _, control_flow| {
+    // 多窗口管理：主窗口 id 用于区分关闭事件；children 持有子窗口的 Window+WebView 保活
+    // （必须存进 HashMap，否则一建即被 drop 立即关闭）。
+    let main_id = win.id();
+    let mut children: HashMap<tao::window::WindowId, (tao::window::Window, wry::WebView)> =
+        HashMap::new();
+    // 子窗口自身的新窗口处理器复用此 proxy，实现子窗口里再点 _blank 也能继续弹窗。
+    let child_proxy = event_loop.create_proxy();
+    // 子窗口图标复用主窗口图标配置（clone 一份 move 进闭包，避免与主窗口构建争用所有权）。
+    let icon_cfg_for_children = window_icon_cfg.clone();
+    // 子窗口默认沿用应用标题与主窗口宽高。
+    let child_title = window.title.clone();
+    let child_w = window.width;
+    let child_h = window.height;
+
+    event_loop.run(move |event, event_loop_target, control_flow| {
         match event {
             Event::WindowEvent {
+                window_id,
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                *control_flow = ControlFlow::Exit;
+                if window_id == main_id {
+                    // 主窗口关闭：直接退出事件循环（children 随闭包一起析构，子窗口不会残留）。
+                    *control_flow = ControlFlow::Exit;
+                    return;
+                }
+                // 子窗口关闭：移除即销毁该子窗口的 Window+WebView。
+                children.remove(&window_id);
+                *control_flow = ControlFlow::Wait;
                 return;
             }
             Event::UserEvent(UserEvent::SplashLoaded) => {
                 splash_loaded = true;
+            }
+            Event::UserEvent(UserEvent::OpenWindow(url)) => {
+                // 在本应用内部新建窗口 + WebView 承接链接，绝不调用系统浏览器。
+                let cp = child_proxy.clone();
+                if let Ok(child_win) = WindowBuilder::new()
+                    .with_title(&child_title)
+                    .with_inner_size(LogicalSize::new(child_w, child_h))
+                    .with_resizable(true)
+                    .with_window_icon(window_icon(&icon_cfg_for_children))
+                    .build(event_loop_target)
+                {
+                    let built = WebViewBuilder::new()
+                        .with_url(&url)
+                        .with_new_window_req_handler(move |u, _f| {
+                            let _ = cp.send_event(UserEvent::OpenWindow(u));
+                            NewWindowResponse::Deny
+                        })
+                        .build(&child_win);
+                    if let Ok(child_wv) = built {
+                        // 存进 HashMap 保活，避免 Window/WebView 被立即 drop。
+                        children.insert(child_win.id(), (child_win, child_wv));
+                    }
+                }
+                *control_flow = ControlFlow::Wait;
+                return;
             }
             _ => {}
         }
