@@ -1,6 +1,6 @@
 [package]
 name = "exeify"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "把网址或本地 HTML 项目一键打包成 Windows exe（零工具链、秒级出包）"
 license = "Apache-2.0"
