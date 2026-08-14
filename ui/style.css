@@ -342,3 +342,38 @@ input[readonly] { background: #fafafa; color: #4a4c52; cursor: default; }
   cursor: pointer;
 }
 .about-foot .repo-link:hover { text-decoration: underline; }
+
+/* 检查更新 */
+.update-box {
+  margin: 16px 0 4px;
+  padding: 14px;
+  background: #fafafa;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.update-version { font-size: 13px; color: var(--text); font-weight: 550; }
+.btn.update-check { padding: 6px 12px; font-size: 12px; }
+.update-status {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 0;
+}
+.update-status:empty { display: none; }
+.update-status.ok { color: var(--ok); }
+.update-status.err { color: var(--err); }
+.update-status.busy { color: var(--text); }
+.btn.update-apply { width: 100%; justify-content: center; }
+.btn.update-apply.hidden { display: none; }

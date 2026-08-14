@@ -121,6 +121,32 @@
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.classList.add("hidden");
   });
+
+  // ---- 检查更新 / 立即更新 ----
+  let updateAssetUrl = "";
+  const updStatus = $("updStatus");
+  const doUpdateBtn = $("doUpdate");
+
+  function setUpdStatus(text, kind) {
+    updStatus.textContent = text || "";
+    updStatus.className = "update-status" + (kind ? " " + kind : "");
+  }
+
+  $("checkUpdate").addEventListener("click", () => {
+    updateAssetUrl = "";
+    doUpdateBtn.classList.add("hidden");
+    $("checkUpdate").disabled = true;
+    setUpdStatus("正在检查更新…", "busy");
+    send({ action: "checkUpdate" });
+  });
+
+  doUpdateBtn.addEventListener("click", () => {
+    if (!updateAssetUrl) return;
+    doUpdateBtn.disabled = true;
+    $("checkUpdate").disabled = true;
+    setUpdStatus("下载中…请勿关闭程序", "busy");
+    send({ action: "doUpdate", url: updateAssetUrl });
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") overlay.classList.add("hidden");
   });
@@ -216,4 +242,42 @@
     setStatus(msg, ok ? "ok" : "err");
   };
   window.__log = (msg) => setStatus(msg, "");
+
+  // ---- 更新相关回调 ----
+  window.__updateInfo = (info) => {
+    info = info || {};
+    $("checkUpdate").disabled = false;
+    if (info.current) {
+      $("updVersion").textContent = "当前版本 v" + info.current;
+    }
+    if (!info.ok) {
+      updateAssetUrl = "";
+      doUpdateBtn.classList.add("hidden");
+      return setUpdStatus("检查失败：" + (info.error || "未知错误"), "err");
+    }
+    if (info.hasUpdate) {
+      updateAssetUrl = info.url || "";
+      doUpdateBtn.classList.remove("hidden");
+      doUpdateBtn.disabled = !updateAssetUrl;
+      let msg = "发现新版本 v" + (info.latest || "");
+      const notes = (info.notes || "").trim();
+      if (notes) {
+        // 只取前若干字符作摘要，避免撑爆弹窗
+        const brief = notes.length > 160 ? notes.slice(0, 160) + "…" : notes;
+        msg += "\n" + brief;
+      }
+      setUpdStatus(msg, "ok");
+    } else {
+      updateAssetUrl = "";
+      doUpdateBtn.classList.add("hidden");
+      setUpdStatus("已是最新版本 v" + (info.current || ""), "ok");
+    }
+  };
+
+  window.__updateResult = (ok, msg) => {
+    // 成功时进程会自替换重启，一般看不到此回调；失败时提示原因。
+    $("checkUpdate").disabled = false;
+    doUpdateBtn.disabled = false;
+    setUpdStatus(msg || (ok ? "更新完成，正在重启…" : "更新失败"), ok ? "ok" : "err");
+  };
 })();

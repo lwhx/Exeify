@@ -13,6 +13,7 @@ mod packer;
 mod payload;
 mod runner;
 mod server;
+mod update;
 
 /// 自定义协议 `app` 的起始地址。
 /// Windows/WebView2 下自定义协议被映射为 `http://<scheme>.localhost/`，
@@ -40,6 +41,9 @@ fn main() {
     // 把 WebView2 的用户数据目录重定向到 %LOCALAPPDATA%，
     // 避免在 exe 旁边生成 <名字>.exe.WebView2 缓存目录。
     redirect_webview_data_dir();
+
+    // 清理上次自更新残留的 <名字>.old.exe（best-effort，忽略错误）。
+    update::cleanup_old();
 
     // 隐藏 CLI：便于脚本化打包与自测（GUI 用户不会用到）。
     let args: Vec<String> = std::env::args().collect();

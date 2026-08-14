@@ -26,6 +26,9 @@ editpe = { version = "0.2", default-features = false, features = ["std"] }
 ico = "0.3"
 # 自己解码 PNG（支持索引/灰度/RGB/RGBA 全类型），已是 ico 的传递依赖
 png = "0.17"
+# 自更新的 HTTPS 客户端：纯 Rust rustls TLS（不依赖系统 OpenSSL），特性精简。
+# JSON 复用项目已有的 serde_json 解析，不启用 ureq 的 json 特性。
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 
 [build-dependencies]
 # 把 exeify.exe 自身的图标编进 PE

@@ -255,6 +255,40 @@ fn handle_ipc(
                 let _ = webview.evaluate_script(&format!("window.__setOutput({});", js_str(&s)));
             }
         }
+        // 检查更新 —— 后台线程查 GitHub 最新版并回调前端
+        "checkUpdate" => {
+            let proxy = proxy.clone();
+            std::thread::spawn(move || {
+                let js = build_check_update_js();
+                let _ = proxy.send_event(UserEvent::Eval(js));
+            });
+        }
+        // 立即更新 —— 后台线程下载并自替换重启（成功则进程退出，无回调）
+        "doUpdate" => {
+            let url = parsed.url.unwrap_or_default();
+            let proxy = proxy.clone();
+            std::thread::spawn(move || {
+                if url.trim().is_empty() {
+                    let js = format!(
+                        "window.__updateResult(false, {});",
+                        js_str("缺少下载地址，请重新检查更新")
+                    );
+                    let _ = proxy.send_event(UserEvent::Eval(js));
+                    return;
+                }
+                match do_update(&url) {
+                    // 成功时 apply_update 会退出进程，通常走不到这里。
+                    Ok(()) => {}
+                    Err(e) => {
+                        let js = format!(
+                            "window.__updateResult(false, {});",
+                            js_str(&format!("{e:#}"))
+                        );
+                        let _ = proxy.send_event(UserEvent::Eval(js));
+                    }
+                }
+            });
+        }
         // 打包 —— 放到后台线程，完成后回调
         "pack" => {
             let Some(req) = parsed.data else {
@@ -341,6 +375,44 @@ fn do_pack(req: PackReq) -> Result<String> {
         m => anyhow::bail!("未知模式：{m}"),
     }
     Ok(output.to_string_lossy().to_string())
+}
+
+/// 后台查最新版本，生成回调前端 `window.__updateInfo({...})` 的 JS。
+///
+/// 回调字段：ok(bool)、current、latest、hasUpdate(bool)、notes、error、url。
+fn build_check_update_js() -> String {
+    let current = crate::update::current_version();
+    let payload = match crate::update::check_latest() {
+        Ok(latest) => {
+            let has_update = crate::update::is_newer(&latest.version, current);
+            serde_json::json!({
+                "ok": true,
+                "current": current,
+                "latest": latest.version,
+                "hasUpdate": has_update,
+                "notes": latest.notes,
+                "url": latest.asset_url,
+                "error": "",
+            })
+        }
+        Err(e) => serde_json::json!({
+            "ok": false,
+            "current": current,
+            "latest": "",
+            "hasUpdate": false,
+            "notes": "",
+            "url": "",
+            "error": format!("{e:#}"),
+        }),
+    };
+    format!("window.__updateInfo({payload});")
+}
+
+/// 后台下载并自替换重启。成功时进程退出，不返回。
+fn do_update(url: &str) -> Result<()> {
+    let bytes = crate::update::download(url)?;
+    crate::update::apply_update(&bytes)?;
+    Ok(())
 }
 
 /// 把前端下拉值解析成窗口状态，未知/缺省时为普通窗口。
