@@ -6,7 +6,8 @@
 //! 本地模式通过内置的回环 HTTP 服务器（`http://127.0.0.1`）提供网页资源，
 //! 以便 Vite/Vue/React 等框架的 ES Module 与前端路由正常工作。
 
-use crate::config::{Mode, PackConfig, SplashCfg, WindowIcon, WindowState};
+use crate::config::{EncInfo, Mode, PackConfig, SplashCfg, WindowIcon, WindowState};
+use crate::crypto;
 use crate::payload::Payload;
 use crate::server;
 use anyhow::{Context, Result};
@@ -47,6 +48,36 @@ fn unzip_to_map(archive: &[u8]) -> Result<HashMap<String, Vec<u8>>> {
     }
     Ok(map)
 }
+
+/// 若 config 带加密信息，则在内存中解密 archive（绝不落盘），否则原样返回明文。
+/// 去遮蔽失败时返回错误，避免用错误密钥解出乱码再触发误导性的 zip 报错。
+fn decrypt_archive(archive: &[u8], enc: &Option<EncInfo>) -> Result<Vec<u8>> {
+    match enc {
+        None => Ok(archive.to_vec()),
+        Some(info) => {
+            let key =
+                crypto::unmask_key(&info.key_b64).context("解密密钥损坏（key 长度/格式错误）")?;
+            let nonce = crypto::unmask_nonce(&info.nonce_b64)
+                .context("解密随机数损坏（nonce 长度/格式错误）")?;
+            Ok(crypto::decrypt(&key, &nonce, archive))
+        }
+    }
+}
+
+/// 源码保护开启时注入的初始化脚本：屏蔽右键菜单与常见开发者快捷键。
+/// 诚实：JS 屏蔽可被禁用 JS / 外部工具绕过，属 casual 阻挡。
+const PROTECT_SCRIPT: &str = r#"(function(){
+  document.addEventListener('contextmenu', function(e){ e.preventDefault(); }, true);
+  document.addEventListener('keydown', function(e){
+    var k = (e.key || '').toLowerCase();
+    // F12
+    if (k === 'f12') { e.preventDefault(); return; }
+    // Ctrl+Shift+I / J / C（开发者工具、控制台、选取元素）
+    if (e.ctrlKey && e.shiftKey && (k === 'i' || k === 'j' || k === 'c')) { e.preventDefault(); return; }
+    // Ctrl+U（查看源码）
+    if (e.ctrlKey && k === 'u') { e.preventDefault(); return; }
+  }, true);
+})();"#;
 
 /// 把 "#rrggbb" 解析为 wry 的 RGBA（不透明）。解析失败时返回 None。
 fn parse_hex_rgba(hex: &str) -> Option<(u8, u8, u8, u8)> {
@@ -110,12 +141,16 @@ pub fn run(payload: Payload) -> Result<()> {
         window,
         splash,
         window_icon: window_icon_cfg,
+        enc,
+        protect,
     } = payload.config.clone();
 
     let target_url = match mode {
         Mode::Url => url.context("URL 模式缺少目标地址")?,
         Mode::Local => {
-            let assets = unzip_to_map(&payload.archive)?;
+            // 若加密则先在内存中解密（绝不落盘），再解压。
+            let plain = decrypt_archive(&payload.archive, &enc)?;
+            let assets = unzip_to_map(&plain)?;
             let entry = if entry.is_empty() {
                 "index.html".to_string()
             } else {
@@ -160,6 +195,13 @@ pub fn run(payload: Payload) -> Result<()> {
     let mut wv_builder = WebViewBuilder::new();
     if let Some(rgba) = bg {
         wv_builder = wv_builder.with_background_color(rgba);
+    }
+    // 源码保护：禁用 DevTools + 注入屏蔽右键/快捷键脚本。放在共同 builder 上，
+    // 对"有启动图"和"无启动图"两条路径都生效。protect=false 时保持现状（便于调试）。
+    if protect {
+        wv_builder = wv_builder
+            .with_devtools(false)
+            .with_initialization_script(PROTECT_SCRIPT);
     }
 
     let has_splash = splash.is_some();
@@ -279,4 +321,58 @@ pub fn run(payload: Payload) -> Result<()> {
             *control_flow = ControlFlow::Wait;
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decrypt_archive_passthrough_when_no_enc() {
+        // enc=None（旧产物 / 未加密）：原样返回明文字节。
+        let data = b"plain-zip-bytes".to_vec();
+        let out = decrypt_archive(&data, &None).unwrap();
+        assert_eq!(out, data);
+    }
+
+    #[test]
+    fn decrypt_archive_recovers_plaintext() {
+        // 加密 -> 填 enc -> decrypt_archive 应还原原文（模拟 runner 解密路径）。
+        let plain = b"<html>secret source here</html>".repeat(8);
+        let key = crypto::random_key();
+        let nonce = crypto::random_nonce();
+        let cipher = crypto::encrypt(&key, &nonce, &plain);
+        let enc = Some(EncInfo {
+            key_b64: crypto::mask_key_b64(&key),
+            nonce_b64: crypto::mask_nonce_b64(&nonce),
+        });
+        let out = decrypt_archive(&cipher, &enc).unwrap();
+        assert_eq!(out, plain);
+    }
+
+    #[test]
+    fn encrypt_then_decrypt_unzips_correctly() {
+        // 端到端：zip -> 加密 -> decrypt_archive -> unzip_to_map 应取回原始文件。
+        use std::io::Write;
+        let buf = std::io::Cursor::new(Vec::new());
+        let mut zw = zip::ZipWriter::new(buf);
+        let opts: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+        zw.start_file("index.html", opts).unwrap();
+        zw.write_all(b"<h1>hi</h1>").unwrap();
+        let archive = zw.finish().unwrap().into_inner();
+
+        let key = crypto::random_key();
+        let nonce = crypto::random_nonce();
+        let cipher = crypto::encrypt(&key, &nonce, &archive);
+        let enc = Some(EncInfo {
+            key_b64: crypto::mask_key_b64(&key),
+            nonce_b64: crypto::mask_nonce_b64(&nonce),
+        });
+        let plain = decrypt_archive(&cipher, &enc).unwrap();
+        let map = unzip_to_map(&plain).unwrap();
+        assert_eq!(
+            map.get("index.html").map(|v| v.as_slice()),
+            Some(&b"<h1>hi</h1>"[..])
+        );
+    }
 }

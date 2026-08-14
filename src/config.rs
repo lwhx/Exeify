@@ -76,6 +76,16 @@ pub struct WindowIcon {
     pub rgba_b64: String,
 }
 
+/// 内嵌资源加密信息（源码保护开启时写入）。key/nonce 均为遮蔽后的 base64。
+/// 诚实：密钥随 exe 内嵌、格式公开，仅提高门槛，不是不可破解的安全。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncInfo {
+    /// 遮蔽后的 key（base64）
+    pub key_b64: String,
+    /// 遮蔽后的 nonce（base64）
+    pub nonce_b64: String,
+}
+
 /// 完整打包配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackConfig {
@@ -94,6 +104,12 @@ pub struct PackConfig {
     /// 运行时窗口/任务栏图标（可选）。为空时回退到内置图标。
     #[serde(default)]
     pub window_icon: Option<WindowIcon>,
+    /// 内嵌资源加密信息。None=未加密（旧产物 / 未开启保护）。
+    #[serde(default)]
+    pub enc: Option<EncInfo>,
+    /// 是否开启源码保护（禁用 DevTools + 屏蔽右键/开发者快捷键）。
+    #[serde(default)]
+    pub protect: bool,
 }
 
 fn default_entry() -> String {
@@ -117,6 +133,9 @@ mod tests {
         assert_eq!(cfg.window.state, WindowState::Normal);
         assert!(cfg.splash.is_none());
         assert!(cfg.window_icon.is_none());
+        // 旧 JSON 无 enc/protect 字段：应默认 None / false，向后兼容。
+        assert!(cfg.enc.is_none());
+        assert!(!cfg.protect);
     }
 
     #[test]
@@ -155,11 +174,18 @@ mod tests {
                 h: 256,
                 rgba_b64: "BBBB".into(),
             }),
+            enc: Some(EncInfo {
+                key_b64: "KKKK".into(),
+                nonce_b64: "NNNN".into(),
+            }),
+            protect: true,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         let back: PackConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.window.state, WindowState::Fullscreen);
         assert_eq!(back.splash.as_ref().unwrap().min_ms, 1500);
         assert_eq!(back.window_icon.as_ref().unwrap().w, 256);
+        assert_eq!(back.enc.as_ref().unwrap().key_b64, "KKKK");
+        assert!(back.protect);
     }
 }

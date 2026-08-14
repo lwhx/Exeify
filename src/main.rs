@@ -6,6 +6,7 @@
 
 mod b64;
 mod config;
+mod crypto;
 mod gui;
 mod icon;
 mod packer;
@@ -114,6 +115,7 @@ fn run_cli(args: &[String]) -> i32 {
         "pack-local" if args.len() >= 4 => {
             let entry = args.get(4).map(|s| s.as_str()).unwrap_or("index.html");
             let icon = args.get(5).map(Path::new);
+            // CLI 默认开启源码保护，与 GUI 默认一致。
             packer::pack_local(
                 Path::new(&args[2]),
                 entry,
@@ -121,11 +123,12 @@ fn run_cli(args: &[String]) -> i32 {
                 Path::new(&args[3]),
                 icon,
                 None,
+                true,
             )
         }
         "pack-url" if args.len() >= 4 => {
             let icon = args.get(4).map(Path::new);
-            packer::pack_url(&args[2], win, Path::new(&args[3]), icon, None)
+            packer::pack_url(&args[2], win, Path::new(&args[3]), icon, None, true)
         }
         _ => {
             eprintln!("用法:\n  exeify pack-local <目录> <输出.exe> [入口]\n  exeify pack-url <网址> <输出.exe>");

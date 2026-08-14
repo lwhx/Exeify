@@ -110,6 +110,8 @@ mod tests {
             window: WindowCfg::default(),
             splash: None,
             window_icon: None,
+            enc: None,
+            protect: false,
         }
     }
 
@@ -142,12 +144,40 @@ mod tests {
             window: WindowCfg::default(),
             splash: None,
             window_icon: None,
+            enc: None,
+            protect: false,
         };
         let out = build_output(&stub, &cfg, &[]).unwrap();
         let p = read_from_bytes(&out).unwrap().unwrap();
         assert_eq!(p.config.mode, Mode::Url);
         assert_eq!(p.config.url.as_deref(), Some("https://example.com"));
         assert!(p.archive.is_empty());
+    }
+
+    #[test]
+    fn roundtrip_encrypted_payload() {
+        // 加密后的 archive（含 enc）应能原样穿过 payload 尾部格式，且解密还原。
+        use crate::config::EncInfo;
+        use crate::crypto;
+        let stub = b"PRETEND_EXE".to_vec();
+        let plain = b"<html>secret</html>".repeat(20);
+        let key = crypto::random_key();
+        let nonce = crypto::random_nonce();
+        let cipher = crypto::encrypt(&key, &nonce, &plain);
+        let mut cfg = sample_cfg();
+        cfg.protect = true;
+        cfg.enc = Some(EncInfo {
+            key_b64: crypto::mask_key_b64(&key),
+            nonce_b64: crypto::mask_nonce_b64(&nonce),
+        });
+        let out = build_output(&stub, &cfg, &cipher).unwrap();
+        let p = read_from_bytes(&out).unwrap().expect("应能解析出载荷");
+        assert_eq!(p.archive, cipher, "密文 archive 应逐字节还原");
+        assert!(p.config.protect);
+        let enc = p.config.enc.expect("应保留 enc");
+        let k = crypto::unmask_key(&enc.key_b64).unwrap();
+        let n = crypto::unmask_nonce(&enc.nonce_b64).unwrap();
+        assert_eq!(crypto::decrypt(&k, &n, &p.archive), plain, "解密应还原原文");
     }
 
     #[test]

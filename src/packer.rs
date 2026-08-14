@@ -3,7 +3,8 @@
 
 //! 打包逻辑：把目录/URL 生成产物 exe。
 
-use crate::config::{Mode, PackConfig, SplashCfg, WindowCfg, WindowIcon};
+use crate::config::{EncInfo, Mode, PackConfig, SplashCfg, WindowCfg, WindowIcon};
+use crate::crypto;
 use crate::payload;
 use anyhow::{anyhow, bail, Context, Result};
 use std::io::Write;
@@ -116,6 +117,7 @@ pub fn pack_local(
     output: &Path,
     icon: Option<&Path>,
     splash: Option<SplashCfg>,
+    protect: bool,
 ) -> Result<()> {
     // 入口文件必须存在
     let entry_path = dir.join(entry);
@@ -123,6 +125,8 @@ pub fn pack_local(
         bail!("入口文件不存在：{}", entry_path.display());
     }
     let archive = zip_dir(dir)?;
+    // 源码保护开启：加密 archive 并记录遮蔽后的 key/nonce；否则明文。
+    let (archive, enc) = maybe_encrypt(archive, protect);
     let config = PackConfig {
         mode: Mode::Local,
         url: None,
@@ -130,8 +134,26 @@ pub fn pack_local(
         window,
         splash,
         window_icon: window_icon_from(icon),
+        enc,
+        protect,
     };
     write_output(&config, &archive, output, icon)
+}
+
+/// 按 `protect` 决定是否加密 archive。
+/// 返回 (可能加密后的 archive 字节, 加密信息)。protect=false 时逐字节维持原样、enc=None。
+fn maybe_encrypt(archive: Vec<u8>, protect: bool) -> (Vec<u8>, Option<EncInfo>) {
+    if !protect || archive.is_empty() {
+        return (archive, None);
+    }
+    let key = crypto::random_key();
+    let nonce = crypto::random_nonce();
+    let cipher = crypto::encrypt(&key, &nonce, &archive);
+    let enc = EncInfo {
+        key_b64: crypto::mask_key_b64(&key),
+        nonce_b64: crypto::mask_nonce_b64(&nonce),
+    };
+    (cipher, Some(enc))
 }
 
 /// 打包 URL -> 产物 exe。参数含义同 [`pack_local`]。
@@ -141,11 +163,13 @@ pub fn pack_url(
     output: &Path,
     icon: Option<&Path>,
     splash: Option<SplashCfg>,
+    protect: bool,
 ) -> Result<()> {
     let url = url.trim();
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         bail!("网址必须以 http:// 或 https:// 开头");
     }
+    // URL 模式无内嵌 archive，无需加密；protect 仅影响运行时禁用查看。
     let config = PackConfig {
         mode: Mode::Url,
         url: Some(url.to_string()),
@@ -153,6 +177,8 @@ pub fn pack_url(
         window,
         splash,
         window_icon: window_icon_from(icon),
+        enc: None,
+        protect,
     };
     write_output(&config, &[], output, icon)
 }
@@ -248,8 +274,38 @@ mod tests {
     #[test]
     fn pack_url_rejects_bad_scheme() {
         let out = std::env::temp_dir().join("h2e_bad.exe");
-        let err = pack_url("ftp://nope", WindowCfg::default(), &out, None, None).unwrap_err();
+        let err = pack_url("ftp://nope", WindowCfg::default(), &out, None, None, true).unwrap_err();
         assert!(err.to_string().contains("http"));
+    }
+
+    #[test]
+    fn maybe_encrypt_off_is_passthrough() {
+        // protect=false：archive 逐字节不变、enc=None（与旧版行为一致）。
+        let data = b"raw-zip-bytes".to_vec();
+        let (out, enc) = maybe_encrypt(data.clone(), false);
+        assert_eq!(out, data);
+        assert!(enc.is_none());
+    }
+
+    #[test]
+    fn maybe_encrypt_on_roundtrips_via_config() {
+        // protect=true：archive 被加密（内容变化），用 enc 里的遮蔽 key/nonce 可还原原文。
+        let data = b"<html>secret source</html>".repeat(10);
+        let (cipher, enc) = maybe_encrypt(data.clone(), true);
+        assert_ne!(cipher, data, "加密后不应等于明文");
+        let enc = enc.expect("protect=true 应产生 enc");
+        let key = crypto::unmask_key(&enc.key_b64).unwrap();
+        let nonce = crypto::unmask_nonce(&enc.nonce_b64).unwrap();
+        let plain = crypto::decrypt(&key, &nonce, &cipher);
+        assert_eq!(plain, data, "解密未还原原文");
+    }
+
+    #[test]
+    fn maybe_encrypt_empty_archive_stays_none() {
+        // URL 模式等空 archive：即便 protect=true 也不加密。
+        let (out, enc) = maybe_encrypt(Vec::new(), true);
+        assert!(out.is_empty());
+        assert!(enc.is_none());
     }
 
     #[test]

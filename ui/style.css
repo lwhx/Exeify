@@ -212,6 +212,9 @@ input[readonly] { background: #fafafa; color: #4a4c52; cursor: default; }
 }
 .check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 
+/* 源码保护：开关下方的诚实提示小字 */
+.protect-note { margin: -4px 0 0 25px; font-size: 12px; color: var(--muted); }
+
 /* Buttons */
 .btn {
   display: inline-flex;

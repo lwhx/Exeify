@@ -69,6 +69,14 @@ struct PackReq {
     /// 启动页背景色 "#rrggbb"
     #[serde(default)]
     splash_bg: Option<String>,
+    /// 源码保护：加密内嵌资源 + 运行时禁用查看。默认开启。
+    #[serde(default = "default_true")]
+    protect: bool,
+}
+
+/// serde 默认值：源码保护默认开启。
+fn default_true() -> bool {
+    true
 }
 
 /// 把图标文件读成 data URL，用于界面预览。文件过大则返回 None。
@@ -305,10 +313,11 @@ fn do_pack(req: PackReq) -> Result<String> {
 
     let splash = build_splash(&req)?;
 
+    let protect = req.protect;
     match req.mode.as_str() {
         "url" => {
             let url = req.url.unwrap_or_default();
-            packer::pack_url(&url, window, &output, icon, splash)?;
+            packer::pack_url(&url, window, &output, icon, splash, protect)?;
         }
         "local" => {
             let folder = req.folder.unwrap_or_default();
@@ -326,6 +335,7 @@ fn do_pack(req: PackReq) -> Result<String> {
                 &output,
                 icon,
                 splash,
+                protect,
             )?;
         }
         m => anyhow::bail!("未知模式：{m}"),

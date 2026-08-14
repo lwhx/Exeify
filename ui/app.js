@@ -87,6 +87,7 @@
       splash: $("splash").value.trim(),
       splash_ms: Math.max(0, Math.round((isNaN(sec) ? 1.5 : sec) * 1000)),
       splash_bg: $("splashBg").value,
+      protect: $("protect").checked,
     };
 
     // 前端基础校验，给小白即时反馈
