@@ -29,6 +29,11 @@ enum UserEvent {
     /// 页面请求打开新窗口（target="_blank" / window.open），携带目标 URL。
     /// 由事件循环在本应用内部新建 tao 窗口 + WebView 承接，绝不调用系统浏览器。
     OpenWindow(String),
+    /// 页面产生的下载/内联资源（blob: / data: URL）。这类 URL 按"文档"隔离，
+    /// 新开的子 WebView 拿不到主页面的 blob，会导致下载失败、只弹空窗口。
+    /// 因此交给主 WebView 在原上下文 load_url：对下载类型 WebView2 会触发下载
+    /// 而非导航离开，从而真正下载到 blob。携带目标 URL。
+    Download(String),
 }
 
 /// 把 zip 全部解压进内存，键为规范化后的相对路径（无前导斜杠）。
@@ -218,11 +223,20 @@ pub fn run(payload: Payload) -> Result<()> {
         wv_builder = wv_builder.with_url(&target_url);
     }
 
-    // 无条件挂新窗口处理器：页面里 target="_blank" / window.open 触发的新窗口请求，
-    // 统一发事件到主循环，由本应用内部新建窗口承接（Deny 拒绝 WebView2 默认行为，绝不走系统浏览器）。
+    // 主 WebView 的新窗口处理器：智能区分两类 target="_blank" / window.open 请求。
+    //  - blob: / data: 开头 → 属"当前文档产生的下载/内联资源"，子 WebView 拿不到
+    //    主页面的 blob（按文档隔离），必须交回主 WebView 在原上下文处理（发 Download 事件，
+    //    事件循环里对主 webview load_url；下载类型 WebView2 会触发下载而不导航离开）。
+    //  - 其它（http/https 等真正页面链接）→ 维持现状，发 OpenWindow 开应用内新窗口。
+    // 两类都 Deny，拒绝 WebView2 默认行为，绝不走系统浏览器。
     let nw_proxy = event_loop.create_proxy();
     wv_builder = wv_builder.with_new_window_req_handler(move |url, _features| {
-        let _ = nw_proxy.send_event(UserEvent::OpenWindow(url));
+        let lower = url.to_ascii_lowercase();
+        if lower.starts_with("blob:") || lower.starts_with("data:") {
+            let _ = nw_proxy.send_event(UserEvent::Download(url));
+        } else {
+            let _ = nw_proxy.send_event(UserEvent::OpenWindow(url));
+        }
         NewWindowResponse::Deny
     });
 
@@ -272,6 +286,14 @@ pub fn run(payload: Payload) -> Result<()> {
             Event::UserEvent(UserEvent::SplashLoaded) => {
                 splash_loaded = true;
             }
+            Event::UserEvent(UserEvent::Download(url)) => {
+                // blob:/data: 下载：交给主 webview 在原上下文加载。对 octet-stream 等
+                // 下载类型，WebView2 触发下载而不导航离开主页面，从而真正下载到 blob。
+                let _ = webview.load_url(&url);
+                // 处理完直接静候事件，绝不落入下方启动图控制流，避免破坏 splash 计时。
+                *control_flow = ControlFlow::Wait;
+                return;
+            }
             Event::UserEvent(UserEvent::OpenWindow(url)) => {
                 // 在本应用内部新建窗口 + WebView 承接链接，绝不调用系统浏览器。
                 let cp = child_proxy.clone();
@@ -282,6 +304,8 @@ pub fn run(payload: Payload) -> Result<()> {
                     .with_window_icon(window_icon(&icon_cfg_for_children))
                     .build(event_loop_target)
                 {
+                    // 子窗口处理器保持现状：一律开应用内新窗口，不做 blob/data 下载区分。
+                    // 子窗口内触发下载是罕见边缘场景，本次不覆盖（真要下载可用 <a download>）。
                     let built = WebViewBuilder::new()
                         .with_url(&url)
                         .with_new_window_req_handler(move |u, _f| {
