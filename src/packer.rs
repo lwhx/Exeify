@@ -183,6 +183,38 @@ pub fn pack_url(
     write_output(&config, &[], output, icon)
 }
 
+/// 由扩展名判断启动图 MIME，仅支持 png / jpg（jpeg）。其它返回 None。
+pub(crate) fn splash_mime(path: &Path) -> Option<&'static str> {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => Some("image/png"),
+        Some("jpg") | Some("jpeg") => Some("image/jpeg"),
+        _ => None,
+    }
+}
+
+/// 从启动图文件路径构造 [`SplashCfg`]：读文件 → base64 → 由扩展名定 mime →
+/// min_ms / bg / fit="cover"。GUI 与 CLI 共用同一逻辑，避免重复。
+/// mime 不受支持或读文件失败时返回错误。
+pub(crate) fn build_splash_cfg(path: &Path, min_ms: u64, bg: &str) -> Result<SplashCfg> {
+    let mime = splash_mime(path)
+        .ok_or_else(|| anyhow!("启动图仅支持 png / jpg"))?
+        .to_string();
+    let bytes =
+        std::fs::read(path).with_context(|| format!("读取启动图失败：{}", path.display()))?;
+    Ok(SplashCfg {
+        image_b64: crate::b64::encode(&bytes),
+        mime,
+        min_ms,
+        bg: bg.to_string(),
+        fit: "cover".to_string(),
+    })
+}
+
 /// 把用户图标解码成 256×256 RGBA，供运行时设为窗口/任务栏图标。
 /// 解码失败或未选图标时返回 None（运行时回退内置图标）。
 fn window_icon_from(icon: Option<&Path>) -> Option<WindowIcon> {

@@ -108,26 +108,12 @@ fn splash_data_url(path: &std::path::Path) -> Option<String> {
     if data.len() > 8 * 1024 * 1024 {
         return None;
     }
-    let mime = splash_mime(path)?;
+    let mime = packer::splash_mime(path)?;
     Some(format!(
         "data:{};base64,{}",
         mime,
         crate::b64::encode(&data)
     ))
-}
-
-/// 由扩展名判断启动图 MIME，仅支持 png / jpg。
-fn splash_mime(path: &std::path::Path) -> Option<&'static str> {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|s| s.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("png") => Some("image/png"),
-        Some("jpg") | Some("jpeg") => Some("image/jpeg"),
-        _ => None,
-    }
 }
 
 fn js_str(s: &str) -> String {
@@ -435,11 +421,6 @@ fn build_splash(req: &PackReq) -> Result<Option<SplashCfg>> {
     else {
         return Ok(None);
     };
-    let mime = splash_mime(&path)
-        .ok_or_else(|| anyhow::anyhow!("启动图仅支持 png / jpg"))?
-        .to_string();
-    let bytes =
-        std::fs::read(&path).with_context(|| format!("读取启动图失败：{}", path.display()))?;
     // 默认 1500ms；背景色默认深石板，与设计文档一致。
     let min_ms = req.splash_ms.unwrap_or(1500);
     let bg = req
@@ -447,15 +428,9 @@ fn build_splash(req: &PackReq) -> Result<Option<SplashCfg>> {
         .as_ref()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
-        .unwrap_or("#0f172a")
-        .to_string();
-    Ok(Some(SplashCfg {
-        image_b64: crate::b64::encode(&bytes),
-        mime,
-        min_ms,
-        bg,
-        fit: "cover".to_string(),
-    }))
+        .unwrap_or("#0f172a");
+    // 复用 packer 的共享启动图构造逻辑（GUI/CLI 同款）。
+    Ok(Some(packer::build_splash_cfg(&path, min_ms, bg)?))
 }
 
 // ---- 内嵌 UI 资源 ----
