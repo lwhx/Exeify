@@ -49,6 +49,11 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 2 {
         match args[1].as_str() {
+            // 打印版本号即退出（供 skill/脚本读取已安装版本做更新比对）。
+            "version" | "--version" | "-V" => {
+                println!("{}", env!("CARGO_PKG_VERSION"));
+                std::process::exit(0);
+            }
             // 新版：命名参数 CLI，便于 AI/脚本驱动。
             "pack" => std::process::exit(run_pack_cli(&args)),
             // 旧版：位置式命令，保持向后兼容。
