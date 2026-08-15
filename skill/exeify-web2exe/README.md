@@ -1,4 +1,4 @@
-# exeify-packer skill
+# exeify-web2exe skill
 
 把 Exeify 封装成一个 Claude Code / AI skill —— 让 AI 按用户意图，把「本地网页目录」或
 「在线网址」打包成 Windows `.exe`。
@@ -8,11 +8,11 @@
 - `exeify.exe` —— **打包进 skill 的 Exeify 可执行文件（本仓库 `.gitignore` 忽略了 `*.exe`，故不入库，需自行放入）**。
 
 ## 安装 / 使用
-1. 把本目录复制到用户 skill 目录：`~/.claude/skills/exeify-packer/`
-   （Windows：`C:\Users\<用户名>\.claude\skills\exeify-packer\`）。
+1. 把本目录复制到用户 skill 目录：`~/.claude/skills/exeify-web2exe/`
+   （Windows：`C:\Users\<用户名>\.claude\skills\exeify-web2exe\`）。
 2. 放入 `exeify.exe`：从 https://github.com/44886/Exeify/releases 下载最新版，
    或用本仓库 `cargo build --release` 产物，改名为 `exeify.exe` 放进该目录。
-3. 重启 Claude Code，skill `exeify-packer` 即可用。用户说「把这个网页/文件夹/网址打包成 exe」
+3. 重启 Claude Code，skill `exeify-web2exe` 即可用。用户说「把这个网页/文件夹/网址打包成 exe」
    时，AI 会自动用它。
 
 ## 维护
