@@ -1,6 +1,8 @@
 ---
 name: exeify-packer
-description: "Use when the user wants to package a website into a standalone Windows .exe — either a local HTML/CSS/JS folder or an online URL — that double-clicks to run with no install (uses the system WebView2). Drives the bundled exeify.exe CLI. Windows only. Triggers: 打包成exe / package website to exe / 网页转exe / 把网址做成桌面程序 / turn HTML folder into an app."
+description: "把网页打包成 Windows exe 的技能。当用户想把「一个本地 HTML/CSS/JS 网页文件夹」或「一个在线网址」打包成可双击运行、免安装的独立 Windows .exe（用系统自带 WebView2 渲染，终端用户无需装任何东西）时使用；可设置窗口标题/尺寸/全屏、程序图标、启动页、源码保护等。仅 Windows。 | Use when the user wants to package a website — a local HTML/CSS/JS folder or an online URL — into a standalone, double-click-to-run Windows .exe (rendered via the system WebView2, no install for end users); supports window title/size/fullscreen, app icon, splash screen, and source protection. Windows only. | 触发/Triggers: 打包成exe、网页打包、网页转exe、把网址做成桌面程序、把文件夹做成exe、package website to exe、turn HTML folder into a desktop app、website to exe。"
+license: Apache-2.0
+compatibility: "Windows only. The bundled exeify.exe is a Windows executable; packed apps rely on WebView2, which is built into Windows 10/11. Not usable on macOS or Linux."
 ---
 
 # Exeify 网页打包器（把网页/网址打包成 Windows exe）
@@ -10,10 +12,12 @@ description: "Use when the user wants to package a website into a standalone Win
 
 ## 前置检查
 1. **仅 Windows 可用**。若当前不是 Windows，直接告诉用户此 skill 只能在 Windows 上运行，停止。
-2. **定位 exeify.exe**：它**就打包在本 skill 目录里**（与本 SKILL.md 同一文件夹，文件名 `exeify.exe`）。
-   用它的绝对路径调用（通常是 `~/.claude/skills/exeify-packer/exeify.exe`，即
-   `C:\Users\<用户名>\.claude\skills\exeify-packer\exeify.exe`）。若该文件不存在，
-   告诉用户 skill 未正确安装（缺 exeify.exe），并让其从 https://github.com/44886/Exeify/releases 下载放入本目录。
+2. **定位 exeify.exe**：它**打包在本 skill 的目录里**（与本 `SKILL.md` 同一个文件夹，文件名 `exeify.exe`）。
+   - 解析路径的可靠方式：取本 SKILL.md 所在目录，拼上 `exeify.exe`。在 Claude Code 里可用变量
+     `${CLAUDE_SKILL_DIR}\exeify.exe`；其它环境用本文件所在目录的绝对路径。
+   - **若该文件不存在**（未随 skill 一起分发）：从
+     https://github.com/44886/Exeify/releases/latest 下载最新的 `exeify-*-windows-x64.exe`，
+     重命名为 `exeify.exe` 放到本 skill 目录后再用。
 
 ## 向用户问清这些（缺就问，别乱猜）
 - **源**（二选一）：要打包的**本地网页目录**（含 index.html 的文件夹）**或**一个**在线网址**（http/https）。
@@ -47,7 +51,7 @@ exeify.exe pack --url <网址>   --out <app.exe> [选项...]
 
 ## 执行与结果判定
 1. 拼好命令后用 Bash/PowerShell 运行（路径含空格要加引号）。
-2. **成功**：标准输出会打印一行 `OK: <输出路径>`，返回码 0。→ 告诉用户产物路径、可双击运行；提醒需 Windows 10+（自带 WebView2）。
+2. **成功**：标准输出打印一行 `OK: <输出路径>`，返回码 0。→ 告诉用户产物路径、可双击运行；提醒需 Windows 10+（自带 WebView2）。
 3. **失败**：stderr 打印 `失败: <原因>`，返回码 1（打包错误）或 2（用法/参数错误）。→ 把原因转述给用户并修正参数重试。
 4. 运行后**确认输出 .exe 文件确实生成**（检查文件存在与大小），再向用户报告成功。
 
@@ -61,3 +65,4 @@ exeify.exe pack --url <网址>   --out <app.exe> [选项...]
 - 产物依赖 Windows 自带的 WebView2（Win10/11 通常已内置）。
 - 源码保护是「提高门槛」而非绝对加密（详见 Exeify 项目说明）。
 - 本地目录会被完整打包进 exe（离线自包含）；网址模式需联网。
+- 项目主页：https://github.com/44886/Exeify
